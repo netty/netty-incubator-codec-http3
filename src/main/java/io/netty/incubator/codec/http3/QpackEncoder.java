@@ -115,8 +115,8 @@ final class QpackEncoder {
      * Encode integer according to
      * <a href="https://tools.ietf.org/html/rfc7541#section-5.1">Section 5.1</a>.
      */
-    private static void encodePrefixedInteger(ByteBuf out, byte mask, int prefix, int i) {
-        int nbits = (int) (Math.pow(2, prefix) - 1);
+    private static void encodePrefixedInteger(ByteBuf out, byte mask, int prefixLength, int i) {
+        int nbits = (1 << prefixLength) - 1;
         if (i < nbits) {
             out.writeByte((byte) (mask | i));
         } else {
@@ -128,26 +128,6 @@ final class QpackEncoder {
                 remainder = remainder / 128;
             }
             out.writeByte((byte) remainder);
-        }
-        // encodePrefixedInteger(out, mask, n, (long) i);
-    }
-
-    /**
-     * Encode integer according to
-     * <a href="https://tools.ietf.org/html/rfc7541#section-5.1">Section 5.1</a>.
-     */
-    private static void encodePrefixedInteger(ByteBuf out, byte mask, int prefix, long i) {
-        assert prefix >= 0 && prefix <= 8 : "N: " + prefix;
-        int nbits = 0xFF >>> (8 - prefix);
-        if (i < nbits) {
-            out.writeByte((int) (mask | i));
-        } else {
-            out.writeByte(mask | nbits);
-            long length = i - nbits;
-            for (; (length & ~0x7F) != 0; length >>>= 7) {
-                out.writeByte((int) ((length & 0x7F) | 0x80));
-            }
-            out.writeByte((int) length);
         }
     }
 }

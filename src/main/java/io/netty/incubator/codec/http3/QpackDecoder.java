@@ -85,22 +85,22 @@ final class QpackDecoder {
     }
 
     private long decodePrefixedInteger(ByteBuf in, int prefixLength) {
-        int prefix = (1 << prefixLength) - 1;
-        int init = in.readByte() & prefix;
-        if (init < prefix) {
-            return init;
+        int nbits = (1 << prefixLength) - 1;
+        int first = in.readByte() & nbits;
+        if (first < nbits) {
+            return first;
         }
 
-        long value = init;
+        long i = first;
         int factor = 0;
         byte next;
         do {
             next = in.readByte();
-            value += (next & 0x7f) << factor;
+            i += (next & 0x7f) << factor;
             factor += 7;
         } while ((next & 0x80) == 0x80);
 
-        return value;
+        return i;
     }
 
     private void decodeIndexed(ByteBuf in, Sink sink) throws Http3Exception {

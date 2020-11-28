@@ -72,7 +72,7 @@
     <netty.version>4.1.54.Final</netty.version>
     <netty.build.version>28</netty.build.version>
     <netty.quic.version>0.0.1.Final-SNAPSHOT</netty.quic.version>
-    <netty.quic.classifier>${os.detected.name}-${os.detected.arch}</netty.quic.classifier>    
+    <netty.quic.classifier>osx-x86_64</netty.quic.classifier>
   </properties>
 
   <build>

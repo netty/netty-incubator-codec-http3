@@ -52,7 +52,7 @@ final class QpackDecoder {
      * <p>
      * This method assumes the entire header block is contained in {@code in}.
      */
-    public void decode(ByteBuf in, Http3Headers headers, boolean validateHeaders) throws Http3Exception {
+    public void decodeHeaders(ByteBuf in, Http3Headers headers, boolean validateHeaders) throws Http3Exception {
         Http3HeadersSink sink = new Http3HeadersSink(headers, maxHeaderListSize, validateHeaders);
         decode(in, sink);
 
@@ -152,7 +152,7 @@ final class QpackDecoder {
 
     private CharSequence getIndexedName(int index) throws Http3Exception {
         if (index <= QpackStaticTable.length) {
-            final QpackHeaderField field = QpackStaticTable.getEntry(index);
+            final QpackHeaderField field = QpackStaticTable.getField(index);
             return field.name;
         }
         throw NAME_ILLEGAL_INDEX_VALUE;
@@ -160,7 +160,7 @@ final class QpackDecoder {
 
     private QpackHeaderField getIndexedHeader(int index) throws Http3Exception {
         if (index <= QpackStaticTable.length) {
-            return QpackStaticTable.getEntry(index);
+            return QpackStaticTable.getField(index);
         }
         throw HEADER_ILLEGAL_INDEX_VALUE;
     }

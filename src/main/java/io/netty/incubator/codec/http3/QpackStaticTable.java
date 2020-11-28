@@ -139,18 +139,18 @@ final class QpackStaticTable {
 
     static final int INDEX_NOT_FOUND = -1;
 
-    private static final CharSequenceMap<Integer> STATIC_INDEX_BY_NAME = createMap();
-
     /**
      * The number of header fields in the static table.
      */
     static final int length = STATIC_TABLE.size();
 
+    private static final CharSequenceMap<Integer> STATIC_INDEX_BY_NAME = createMap(length);
+
     /**
      * Return the header field at the given index value.
      * Note that QPACK uses 0-based indexing when HPACK is using 1-based.
      */
-    static QpackHeaderField getEntry(int index) {
+    static QpackHeaderField getField(int index) {
         return STATIC_TABLE.get(index);
     }
 
@@ -177,10 +177,9 @@ final class QpackStaticTable {
         }
 
         // Note this assumes all entries for a given header field are sequential.
-        // TODO: Is this in right order?
         while (index < length) {
-            QpackHeaderField entry = getEntry(index);
-            if (QpackUtil.equalsVariableTime(name, entry.name) && QpackUtil.equalsVariableTime(value, entry.value)) {
+            QpackHeaderField field = getField(index);
+            if (QpackUtil.equalsVariableTime(name, field.name) && QpackUtil.equalsVariableTime(value, field.value)) {
                 return index;
             }
             index++;
@@ -193,15 +192,14 @@ final class QpackStaticTable {
      * Creates a map CharSequenceMap header name to index value to allow quick lookup.
      */
     @SuppressWarnings("unchecked")
-    private static CharSequenceMap<Integer> createMap() {
+    private static CharSequenceMap<Integer> createMap(int length) {
         CharSequenceMap<Integer> mapping =
             new CharSequenceMap<Integer>(true, UnsupportedValueConverter.<Integer>instance(), length);
         // Iterate through the static table in reverse order to
         // save the smallest index for a given name in the map.
         for (int index = length - 1; index >= 0; index--) {
-            QpackHeaderField entry = getEntry(index);
-            CharSequence name = entry.name;
-            mapping.set(name, index);
+            QpackHeaderField field = getField(index);
+            mapping.set(field.name, index);
         }
         return mapping;
     }

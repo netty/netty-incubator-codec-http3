@@ -15,8 +15,10 @@
  */
 package io.netty.incubator.codec.http3;
 
-import io.netty.handler.codec.Headers;
+public class Http3Exception extends Exception {
 
-public interface Http3Headers extends Headers<CharSequence, CharSequence, Http3Headers> {
-    // TODO: implement me
+    Http3Exception(String message) {
+        super(message);
+    }
+
 }

@@ -85,7 +85,7 @@ final class QpackDecoder {
     }
 
     private long decodePrefixedInteger(ByteBuf in, int prefixLength) {
-        int prefix = 1 << prefixLength - 1;
+        int prefix = (1 << prefixLength) - 1;
         int init = in.readByte() & prefix;
         if (init < prefix) {
             return init;
@@ -125,16 +125,16 @@ final class QpackDecoder {
     }
 
     private void decodeLiteral(ByteBuf in, Sink sink) throws Http3Exception {
-        final CharSequence name = decodePrefixedStringLiteral(in, 3, 0x08);
+        final CharSequence name = decodePrefixedStringLiteral(in, (byte) 0x8, 3);
         final CharSequence value = decodePrefixedStringLiteral(in);
         sink.appendToHeaderList(name, value);
     }
 
     private CharSequence decodePrefixedStringLiteral(ByteBuf in) throws Http3Exception {
-        return decodePrefixedStringLiteral(in, 0x40, 7);
+        return decodePrefixedStringLiteral(in, (byte) 0x80, 7);
     }
 
-    private CharSequence decodePrefixedStringLiteral(ByteBuf in, int mask, int prefix) throws Http3Exception {
+    private CharSequence decodePrefixedStringLiteral(ByteBuf in, byte mask, int prefix) throws Http3Exception {
         final boolean huffmanEncoded = (in.getByte(in.readerIndex()) & mask) == mask;
         final int length = (int) decodePrefixedInteger(in, prefix);
         return decodeStringLiteral(in, length, huffmanEncoded);

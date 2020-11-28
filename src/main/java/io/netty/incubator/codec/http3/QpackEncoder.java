@@ -40,11 +40,11 @@ final class QpackEncoder {
     public void encodeHeaders(ByteBuf out, Http3Headers headers) {
         // Required Insert Count
         // https://tools.ietf.org/html/draft-ietf-quic-qpack-19#section-4.5.1.1
-        encodePrefixedInteger(out, 0, 8, 0);
+        encodePrefixedInteger(out, (byte) 0x00, 8, 0);
 
         // Delta Base
         // https://tools.ietf.org/html/draft-ietf-quic-qpack-19#section-4.5.1.2
-        encodePrefixedInteger(out, 0, 7, 0);
+        encodePrefixedInteger(out, (byte) 0x00, 7, 0);
 
         for (Map.Entry<CharSequence, CharSequence> header : headers) {
             CharSequence name = header.getKey();
@@ -78,18 +78,18 @@ final class QpackEncoder {
     private void encodeIndexed(ByteBuf out, int index) {
         // TODO: mask will be different for static & dynamic tables
         // 1Txxxxxx pattern, forcing T to 1
-        encodePrefixedInteger(out, 0xc0, 6, index);
+        encodePrefixedInteger(out, (byte) 0xc0, 6, index);
     }
 
     private void encodeLiteralWithNameRef(ByteBuf out, CharSequence name, CharSequence value, int nameIndex) {
         // TODO: mask will be different for static & dynamic tables
         // 01NTxxxx pattern, forcing N to 0 and T to 1
-        encodePrefixedInteger(out, 0x50, 4, nameIndex);
+        encodePrefixedInteger(out, (byte) 0x50, 4, nameIndex);
         encodeStringLiteral(out, value);
     }
 
     private void encodeLiteral(ByteBuf out, CharSequence name, CharSequence value) {
-        encodeStringLiteral(out, 0x20 | 0x8, 3, name);
+        encodeStringLiteral(out, (byte) (0x20 | 0x8), 3, name);
         encodeStringLiteral(out, value);
     }
 
@@ -98,14 +98,14 @@ final class QpackEncoder {
      * <a href="https://tools.ietf.org/html/rfc7541#section-5.2">Section 5.2</a>.
      */
     private void encodeStringLiteral(ByteBuf out, CharSequence value) {
-        encodeStringLiteral(out, 0x80, 7, value);
+        encodeStringLiteral(out, (byte) 0x80, 7, value);
     }
 
     /**
      * Encode string literal according to Section 5.2.
      * <a href="https://tools.ietf.org/html/rfc7541#section-5.2">Section 5.2</a>.
      */
-    private void encodeStringLiteral(ByteBuf out, int mask, int prefix, CharSequence value) {
+    private void encodeStringLiteral(ByteBuf out, byte mask, int prefix, CharSequence value) {
         int huffmanLength = huffmanEncoder.getEncodedLength(value);
         encodePrefixedInteger(out, mask, prefix, huffmanLength);
         huffmanEncoder.encode(out, value);
@@ -115,15 +115,28 @@ final class QpackEncoder {
      * Encode integer according to
      * <a href="https://tools.ietf.org/html/rfc7541#section-5.1">Section 5.1</a>.
      */
-    private static void encodePrefixedInteger(ByteBuf out, int mask, int n, int i) {
-        encodePrefixedInteger(out, mask, n, (long) i);
+    private static void encodePrefixedInteger(ByteBuf out, byte mask, int prefix, int i) {
+        int nbits = (int) (Math.pow(2, prefix) - 1);
+        if (i < nbits) {
+            out.writeByte((byte) (mask | i));
+        } else {
+            out.writeByte((byte) (mask | nbits));
+            int remainder = i - nbits;
+            while (remainder > 128) {
+                byte next = (byte) ((remainder % 128) | 0x80);
+                out.writeByte(next);
+                remainder = remainder / 128;
+            }
+            out.writeByte((byte) remainder);
+        }
+        // encodePrefixedInteger(out, mask, n, (long) i);
     }
 
     /**
      * Encode integer according to
      * <a href="https://tools.ietf.org/html/rfc7541#section-5.1">Section 5.1</a>.
      */
-    private static void encodePrefixedInteger(ByteBuf out, int mask, int prefix, long i) {
+    private static void encodePrefixedInteger(ByteBuf out, byte mask, int prefix, long i) {
         assert prefix >= 0 && prefix <= 8 : "N: " + prefix;
         int nbits = 0xFF >>> (8 - prefix);
         if (i < nbits) {

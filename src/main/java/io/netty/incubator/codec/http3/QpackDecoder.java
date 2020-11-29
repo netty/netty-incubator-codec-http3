@@ -208,6 +208,7 @@ final class QpackDecoder {
                 return;
             }
 
+            // TODO: implement validation properly
             // if (validate) {
             //     try {
             //         previousType = QpackDecoder.validate(name, previousType);

@@ -45,6 +45,11 @@ public class QpackEncoderDecoderTest {
 
         assertEquals(5, decHeaders.size());
         assertEquals(new AsciiString("netty.quic"), decHeaders.authority());
+        assertEquals(new AsciiString("/"), decHeaders.path());
         assertEquals(new AsciiString("GET"), decHeaders.method());
+        assertEquals(new AsciiString("417"), decHeaders.status());
+        assertEquals(new AsciiString("19"), decHeaders.get("x-qpack-draft"));
+
+        out.release();
     }
 }

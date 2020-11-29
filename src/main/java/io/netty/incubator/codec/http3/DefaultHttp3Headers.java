@@ -20,15 +20,13 @@ import io.netty.handler.codec.DefaultHeaders;
 import io.netty.util.AsciiString;
 import io.netty.util.ByteProcessor;
 import io.netty.util.internal.PlatformDependent;
-import io.netty.util.internal.UnstableApi;
 
 import static io.netty.incubator.codec.http3.Http3Headers.PseudoHeaderName.hasPseudoHeaderFormat;
 import static io.netty.util.AsciiString.CASE_INSENSITIVE_HASHER;
 import static io.netty.util.AsciiString.CASE_SENSITIVE_HASHER;
 import static io.netty.util.AsciiString.isUpperCase;
 
-@UnstableApi
-public class DefaultHttp3Headers
+public final class DefaultHttp3Headers
         extends DefaultHeaders<CharSequence, CharSequence, Http3Headers> implements Http3Headers {
     private static final ByteProcessor HTTP3_NAME_VALIDATOR_PROCESSOR = new ByteProcessor() {
         @Override
@@ -196,7 +194,7 @@ public class DefaultHttp3Headers
     }
 
     @Override
-    protected final HeaderEntry<CharSequence, CharSequence> newHeaderEntry(int h, CharSequence name, CharSequence value,
+    protected HeaderEntry<CharSequence, CharSequence> newHeaderEntry(int h, CharSequence name, CharSequence value,
                                                            HeaderEntry<CharSequence, CharSequence> next) {
         return new Http3HeaderEntry(h, name, value, next);
     }

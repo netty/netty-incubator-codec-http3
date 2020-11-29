@@ -59,18 +59,13 @@ final class QpackEncoder {
      * TODO: implement dynamic table
      */
     private void encodeHeader(ByteBuf out, CharSequence name, CharSequence value) {
-        int nameAndValueIndex = QpackStaticTable.getIndexInsensitive(name, value);
-        if (nameAndValueIndex == QpackStaticTable.INDEX_NOT_FOUND) {
-            // TODO: this is somewhat inefficient, we can update index search
-            // to keep track for both name+value and name only results at the same time
-            int nameIndex = QpackStaticTable.getIndex(name);
-            if (nameIndex == QpackStaticTable.INDEX_NOT_FOUND) {
-                encodeLiteral(out, name, value);
-            } else {
-                encodeLiteralWithNameRef(out, name, value, nameIndex);
-            }
+        int index = QpackStaticTable.findField(name, value);
+        if (index == QpackStaticTable.NOT_FOUND) {
+            encodeLiteral(out, name, value);
+        } else if ((index & QpackStaticTable.MASK_NAME_REF) == QpackStaticTable.MASK_NAME_REF) {
+            encodeLiteralWithNameRef(out, name, value, index ^ QpackStaticTable.MASK_NAME_REF);
         } else {
-            encodeIndexed(out, nameAndValueIndex);
+            encodeIndexed(out, index);
         }
         return;
     }

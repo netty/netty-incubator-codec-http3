@@ -23,6 +23,17 @@ import io.netty.util.AsciiString;
 
 final class QpackStaticTable {
 
+    static final int NOT_FOUND = -1;
+
+    /**
+     * Special mask used to disambiguate exact pair index from
+     * name only index and avoid executing lookup twice. Supposed
+     * to be used internally. The value should be large enough
+     * not to override bits from static table index (current size
+     * of the table is 99 elements).
+     */
+    static final int MASK_NAME_REF = 1 << 10;
+
     /**
      * Appendix A: Static Table
      * https://tools.ietf.org/html/draft-ietf-quic-qpack-19#appendix-A
@@ -128,6 +139,13 @@ final class QpackStaticTable {
         newHeaderField("x-frame-options", "deny"),
         newHeaderField("x-frame-options", "sameorigin"));
 
+    /**
+     * The number of header fields in the static table.
+     */
+    static final int length = STATIC_TABLE.size();
+
+    private static final CharSequenceMap<Integer> STATIC_INDEX_BY_NAME = createMap(length);
+
     private static QpackHeaderField newEmptyHeaderField(String name) {
         return new QpackHeaderField(AsciiString.cached(name), AsciiString.EMPTY_STRING);
     }
@@ -135,15 +153,6 @@ final class QpackStaticTable {
     private static QpackHeaderField newHeaderField(String name, String value) {
         return new QpackHeaderField(AsciiString.cached(name), AsciiString.cached(value));
     }
-
-    static final int INDEX_NOT_FOUND = -1;
-
-    /**
-     * The number of header fields in the static table.
-     */
-    static final int length = STATIC_TABLE.size();
-
-    private static final CharSequenceMap<Integer> STATIC_INDEX_BY_NAME = createMap(length);
 
     /**
      * Return the header field at the given index value.
@@ -160,22 +169,27 @@ final class QpackStaticTable {
     static int getIndex(CharSequence name) {
         Integer index = STATIC_INDEX_BY_NAME.get(name);
         if (index == null) {
-            return INDEX_NOT_FOUND;
+            return NOT_FOUND;
         }
         return index;
     }
 
     /**
-     * Returns the index value for the given header field in the static table.
-     * Returns -1 if the header field is not in the static table.
+     * Returns:
+     *    a) the index value for the given header field in the static table (when found);
+     *    b) the index value for a given name with a single bit masked (no exact match);
+     *    c) -1 if name was not found in the static table.
      */
-    static int getIndexInsensitive(CharSequence name, CharSequence value) {
-        int index = getIndex(name);
-        if (index == INDEX_NOT_FOUND) {
-            return INDEX_NOT_FOUND;
+    static int findField(CharSequence name, CharSequence value) {
+        int nameIndex = getIndex(name);
+        // Early return if name not found in the table
+        if (nameIndex == NOT_FOUND) {
+            return NOT_FOUND;
         }
 
+        // If name was found, check all subsequence elements of the table for exact match.
         // Note this assumes all entries for a given header field are sequential.
+        int index = nameIndex;
         while (index < length) {
             QpackHeaderField field = getField(index);
             if (QpackUtil.equalsVariableTime(name, field.name) && QpackUtil.equalsVariableTime(value, field.value)) {
@@ -184,7 +198,8 @@ final class QpackStaticTable {
             index++;
         }
 
-        return INDEX_NOT_FOUND;
+        // No exact match was found but we still can reference the name
+        return nameIndex | MASK_NAME_REF;
     }
 
     /**

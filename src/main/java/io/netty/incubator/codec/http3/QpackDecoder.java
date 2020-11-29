@@ -140,7 +140,6 @@ final class QpackDecoder {
         return decodeStringLiteral(in, length, huffmanEncoded);
     }
 
-    // TODO: not sure if integer length is enough
     private CharSequence decodeStringLiteral(ByteBuf in, int length, boolean huffmanEncoded) throws Http3Exception {
         if (huffmanEncoded) {
             return huffmanDecoder.decode(in, length);

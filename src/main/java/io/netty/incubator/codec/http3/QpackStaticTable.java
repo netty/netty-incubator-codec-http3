@@ -182,13 +182,13 @@ final class QpackStaticTable {
      */
     static int findFieldIndex(CharSequence name, CharSequence value) {
         int nameIndex = getIndex(name);
-        // Early return if name not found in the table
+
+        // Early return if name not found in the table.
         if (nameIndex == NOT_FOUND) {
             return NOT_FOUND;
         }
 
         // If name was found, check all subsequence elements of the table for exact match.
-        // Note this assumes all entries for a given header field are sequential.
         int index = nameIndex;
         while (index < length) {
             QpackHeaderField field = getField(index);
@@ -198,7 +198,7 @@ final class QpackStaticTable {
             index++;
         }
 
-        // No exact match was found but we still can reference the name
+        // No exact match was found but we still can reference the name.
         return nameIndex | MASK_NAME_REF;
     }
 

@@ -180,7 +180,7 @@ final class QpackStaticTable {
      *    b) the index value for a given name with a single bit masked (no exact match);
      *    c) -1 if name was not found in the static table.
      */
-    static int findField(CharSequence name, CharSequence value) {
+    static int findFieldIndex(CharSequence name, CharSequence value) {
         int nameIndex = getIndex(name);
         // Early return if name not found in the table
         if (nameIndex == NOT_FOUND) {

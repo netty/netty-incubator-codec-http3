@@ -59,7 +59,7 @@ final class QpackEncoder {
      * TODO: implement dynamic table
      */
     private void encodeHeader(ByteBuf out, CharSequence name, CharSequence value) {
-        int index = QpackStaticTable.findField(name, value);
+        int index = QpackStaticTable.findFieldIndex(name, value);
         if (index == QpackStaticTable.NOT_FOUND) {
             encodeLiteral(out, name, value);
         } else if ((index & QpackStaticTable.MASK_NAME_REF) == QpackStaticTable.MASK_NAME_REF) {

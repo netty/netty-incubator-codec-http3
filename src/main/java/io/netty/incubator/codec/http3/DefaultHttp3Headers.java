@@ -17,15 +17,12 @@ package io.netty.incubator.codec.http3;
 
 import io.netty.handler.codec.CharSequenceValueConverter;
 import io.netty.handler.codec.DefaultHeaders;
-import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.util.AsciiString;
 import io.netty.util.ByteProcessor;
 import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.UnstableApi;
 
-import static io.netty.handler.codec.http2.Http2Error.PROTOCOL_ERROR;
-import static io.netty.handler.codec.http2.Http2Exception.connectionError;
-import static io.netty.handler.codec.http2.Http2Headers.PseudoHeaderName.hasPseudoHeaderFormat;
+import static io.netty.incubator.codec.http3.Http3Headers.PseudoHeaderName.hasPseudoHeaderFormat;
 import static io.netty.util.AsciiString.CASE_INSENSITIVE_HASHER;
 import static io.netty.util.AsciiString.CASE_SENSITIVE_HASHER;
 import static io.netty.util.AsciiString.isUpperCase;
@@ -33,41 +30,41 @@ import static io.netty.util.AsciiString.isUpperCase;
 @UnstableApi
 public class DefaultHttp3Headers
         extends DefaultHeaders<CharSequence, CharSequence, Http3Headers> implements Http3Headers {
-    private static final ByteProcessor HTTP2_NAME_VALIDATOR_PROCESSOR = new ByteProcessor() {
+    private static final ByteProcessor HTTP3_NAME_VALIDATOR_PROCESSOR = new ByteProcessor() {
         @Override
         public boolean process(byte value) {
             return !isUpperCase(value);
         }
     };
-    static final NameValidator<CharSequence> HTTP2_NAME_VALIDATOR = new NameValidator<CharSequence>() {
+    static final NameValidator<CharSequence> HTTP3_NAME_VALIDATOR = new NameValidator<CharSequence>() {
         @Override
         public void validateName(CharSequence name) {
             if (name == null || name.length() == 0) {
-                PlatformDependent.throwException(connectionError(PROTOCOL_ERROR,
-                        "empty headers are not allowed [%s]", name));
+                PlatformDependent.throwException(
+                    new Http3Exception(String.format("empty headers are not allowed [%s]", name)));
             }
             if (name instanceof AsciiString) {
                 final int index;
                 try {
-                    index = ((AsciiString) name).forEachByte(HTTP2_NAME_VALIDATOR_PROCESSOR);
-                } catch (Http2Exception e) {
+                    index = ((AsciiString) name).forEachByte(HTTP3_NAME_VALIDATOR_PROCESSOR);
+                } catch (Http3Exception e) {
                     PlatformDependent.throwException(e);
                     return;
                 } catch (Throwable t) {
-                    PlatformDependent.throwException(connectionError(PROTOCOL_ERROR, t,
-                            "unexpected error. invalid header name [%s]", name));
+                    PlatformDependent.throwException(
+                        new Http3Exception(String.format("unexpected error. invalid header name [%s]", name)));
                     return;
                 }
 
                 if (index != -1) {
-                    PlatformDependent.throwException(connectionError(PROTOCOL_ERROR,
-                            "invalid header name [%s]", name));
+                    PlatformDependent.throwException(
+                        new Http3Exception(String.format("invalid header name [%s]", name)));
                 }
             } else {
                 for (int i = 0; i < name.length(); ++i) {
                     if (isUpperCase(name.charAt(i))) {
-                        PlatformDependent.throwException(connectionError(PROTOCOL_ERROR,
-                                "invalid header name [%s]", name));
+                        PlatformDependent.throwException(
+                            new Http3Exception(String.format("invalid header name [%s]", name)));
                     }
                 }
             }
@@ -97,7 +94,7 @@ public class DefaultHttp3Headers
         // headers.
         super(CASE_SENSITIVE_HASHER,
               CharSequenceValueConverter.INSTANCE,
-              validate ? HTTP2_NAME_VALIDATOR : NameValidator.NOT_NULL);
+              validate ? HTTP3_NAME_VALIDATOR : NameValidator.NOT_NULL);
     }
 
     /**
@@ -113,7 +110,7 @@ public class DefaultHttp3Headers
         // headers.
         super(CASE_SENSITIVE_HASHER,
               CharSequenceValueConverter.INSTANCE,
-              validate ? HTTP2_NAME_VALIDATOR : NameValidator.NOT_NULL,
+              validate ? HTTP3_NAME_VALIDATOR : NameValidator.NOT_NULL,
               arraySizeHint);
     }
 

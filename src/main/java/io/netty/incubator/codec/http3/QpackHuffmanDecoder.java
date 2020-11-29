@@ -19,8 +19,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.util.AsciiString;
 import io.netty.util.ByteProcessor;
 
-// import static io.netty.handler.codec.http2.Http2Error.COMPRESSION_ERROR;
-
 final class QpackHuffmanDecoder implements ByteProcessor {
 
     /* Scroll to the bottom! */

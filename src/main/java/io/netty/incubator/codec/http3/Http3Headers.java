@@ -19,7 +19,6 @@ import java.util.Iterator;
 import java.util.Map.Entry;
 
 import io.netty.handler.codec.Headers;
-import io.netty.handler.codec.http2.CharSequenceMap;
 import io.netty.util.AsciiString;
 
 public interface Http3Headers extends Headers<CharSequence, CharSequence, Http3Headers> {

@@ -19,7 +19,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import io.netty.handler.codec.UnsupportedValueConverter;
-import io.netty.handler.codec.http2.CharSequenceMap;
 import io.netty.util.AsciiString;
 
 final class QpackStaticTable {

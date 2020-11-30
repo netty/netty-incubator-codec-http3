@@ -209,8 +209,6 @@ final class QpackStaticTable {
     private static CharSequenceMap<List<Integer>> createMap(int length) {
         CharSequenceMap<List<Integer>> mapping =
             new CharSequenceMap<List<Integer>>(true, UnsupportedValueConverter.<List<Integer>>instance(), length);
-        // Iterate through the static table in reverse order to
-        // save the smallest index for a given name in the map.
         for (int index = 0; index < length; index++) {
             final QpackHeaderField field = getField(index);
             final List<Integer> cursor = mapping.get(field.name);

@@ -19,6 +19,8 @@ import io.netty.buffer.ByteBuf;
 import io.netty.util.AsciiString;
 
 import static io.netty.util.internal.ObjectUtil.checkPositive;
+import static io.netty.incubator.codec.http3.Http3Headers.PseudoHeaderName.getPseudoHeader;
+import static io.netty.incubator.codec.http3.Http3Headers.PseudoHeaderName.hasPseudoHeaderFormat;
 
 final class QpackDecoder {
 
@@ -164,10 +166,34 @@ final class QpackDecoder {
         throw HEADER_ILLEGAL_INDEX_VALUE;
     }
 
-    // private static HeaderType validate(CharSequence name, HeaderType previousHeaderType) throws Http3Exception {
-    //     // TODO: implement
-    //     return previousHeaderType;
-    // }
+    private static HeaderType validate(CharSequence name, HeaderType previousHeaderType) throws Http3Exception {
+        if (hasPseudoHeaderFormat(name)) {
+            if (previousHeaderType == HeaderType.REGULAR_HEADER) {
+                throw new Http3Exception(String.format("Pseudo-header field '%s' found after regular header.", name));
+            }
+
+            final Http3Headers.PseudoHeaderName pseudoHeader = getPseudoHeader(name);
+            if (pseudoHeader == null) {
+                throw new Http3Exception(String.format("Invalid HTTP/3 pseudo-header '%s' encountered.", name));
+            }
+
+            final HeaderType currentHeaderType = pseudoHeader.isRequestOnly() ?
+                    HeaderType.REQUEST_PSEUDO_HEADER : HeaderType.RESPONSE_PSEUDO_HEADER;
+            if (previousHeaderType != null && currentHeaderType != previousHeaderType) {
+                throw new Http3Exception(String.format("Mix of request and response pseudo-headers."));
+            }
+
+            return currentHeaderType;
+        }
+
+        return HeaderType.REGULAR_HEADER;
+    }
+
+    private enum HeaderType {
+        REGULAR_HEADER,
+        REQUEST_PSEUDO_HEADER,
+        RESPONSE_PSEUDO_HEADER
+    }
 
     private interface Sink {
         void appendToHeaderList(CharSequence name, CharSequence value);
@@ -181,6 +207,7 @@ final class QpackDecoder {
         private long headersLength;
         private boolean exceededMaxLength;
         private Http3Exception validationException;
+        private HeaderType previousType;
 
         Http3HeadersSink(Http3Headers headers, long maxHeaderListSize, boolean validate) {
             this.headers = headers;
@@ -191,7 +218,8 @@ final class QpackDecoder {
         @Override
         public void finish() throws Http3Exception {
             if (exceededMaxLength) {
-                // TODO: check would require information from peer?
+                throw new Http3Exception(
+                    String.format("Header size exceeded max allowed size (%d)", maxHeaderListSize));
             } else if (validationException != null) {
                 throw validationException;
             }
@@ -207,15 +235,14 @@ final class QpackDecoder {
                 return;
             }
 
-            // TODO: implement validation properly
-            // if (validate) {
-            //     try {
-            //         previousType = QpackDecoder.validate(name, previousType);
-            //     } catch (Http3Exception ex) {
-            //         validationException = ex;
-            //         return;
-            //     }
-            // }
+            if (validate) {
+                try {
+                    previousType = QpackDecoder.validate(name, previousType);
+                } catch (Http3Exception ex) {
+                    validationException = ex;
+                    return;
+                }
+            }
 
             headers.add(name, value);
         }

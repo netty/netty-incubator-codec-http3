@@ -24,7 +24,7 @@ import io.netty.util.AsciiString;
 public interface Http3Headers extends Headers<CharSequence, CharSequence, Http3Headers> {
 
     /**
-     * HTTP/2 pseudo-headers names.
+     * HTTP/2 (and HTTP/3) pseudo-headers names.
      */
     enum PseudoHeaderName {
         /**

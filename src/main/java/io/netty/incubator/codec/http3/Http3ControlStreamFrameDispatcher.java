@@ -20,9 +20,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.ChannelPromiseNotifier;
-import io.netty.incubator.codec.quic.QuicStreamChannel;
-
-import java.util.NoSuchElementException;
+import io.netty.util.internal.ObjectUtil;
 
 /**
  * {@link ChannelOutboundHandlerAdapter} which will intercept writes and dispatch {@link Http3ControlStreamFrame}s
@@ -30,11 +28,15 @@ import java.util.NoSuchElementException;
  * that are no the control stream itself.
  */
 final class Http3ControlStreamFrameDispatcher extends ChannelOutboundHandlerAdapter {
+    private final Channel localControlStream;
 
-    static final Http3ControlStreamFrameDispatcher INSTANCE = new Http3ControlStreamFrameDispatcher();
+    Http3ControlStreamFrameDispatcher(Channel localControlStream) {
+        this.localControlStream = ObjectUtil.checkNotNull(localControlStream, "localControlStream");
+    }
 
-    private Http3ControlStreamFrameDispatcher() { }
-
+    /**
+     * Shared per HTTP3 connection.
+     */
     @Override
     public boolean isSharable() {
         return true;
@@ -42,19 +44,11 @@ final class Http3ControlStreamFrameDispatcher extends ChannelOutboundHandlerAdap
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
-        if (msg instanceof Http3ControlStreamFrame) {
-            QuicStreamChannel channel = (QuicStreamChannel) ctx.channel();
-            long id = Http3CodecUtils.localControlStreamId(channel);
-            // Check if we are already on the local control frame or not.
-            if (id != channel.streamId()) {
-                Channel localControlStream = channel.parent().stream(id);
-                if (localControlStream == null) {
-                    promise.setFailure(new NoSuchElementException("Couldn't find control stream"));
-                } else {
-                    localControlStream.writeAndFlush(msg).addListener(new ChannelPromiseNotifier(promise));
-                }
-                return;
-            }
+        // Check if we are already on the local control frame or not.
+        if (ctx.channel() != localControlStream && msg instanceof Http3ControlStreamFrame) {
+            // write and flush as otherwise we may never flush the control stream for the write.
+            localControlStream.writeAndFlush(msg).addListener(new ChannelPromiseNotifier(promise));
+            return;
         }
         ctx.write(msg, promise);
     }

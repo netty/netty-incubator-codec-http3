@@ -19,25 +19,12 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.incubator.codec.quic.QuicChannel;
-import io.netty.incubator.codec.quic.QuicStreamChannel;
 import io.netty.util.CharsetUtil;
 
 final class Http3CodecUtils {
     static final long DEFAULT_MAX_HEADER_LIST_SIZE = 0xffffffffL;
 
     private Http3CodecUtils() { }
-
-    /**
-     * Returns the stream id for the local created control stream that is used by the HTTP 3 connection that this
-     * {@link QuicStreamChannel} is part of.
-     */
-    static long localControlStreamId(QuicStreamChannel channel) {
-        // The local control stream is always the first unidirectional stream we create.
-        if (channel.isLocalCreated()) {
-            return channel.streamId() % 2 == 0 ? 2 : 3;
-        }
-        return channel.streamId() % 2 == 0 ? 3 : 2;
-    }
 
     /**
      * Returns the number of bytes needed to encode the variable length integer.

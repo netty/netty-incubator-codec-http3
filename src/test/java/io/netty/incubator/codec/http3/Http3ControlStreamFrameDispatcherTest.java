@@ -15,23 +15,18 @@
  */
 package io.netty.incubator.codec.http3;
 
-import io.netty.channel.DefaultChannelId;
 import io.netty.channel.embedded.EmbeddedChannel;
-import io.netty.incubator.codec.quic.QuicChannel;
 import org.junit.Test;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
 
 public class Http3ControlStreamFrameDispatcherTest {
     @Test
     public void testOnlyDispatchControlFrame() {
-        QuicChannel parent = mock(QuicChannel.class);
-
-        EmbeddedChannel channel = new EmbeddedChannel(parent, DefaultChannelId.newInstance(), true, false,
-                Http3ControlStreamFrameDispatcher.INSTANCE);
+        EmbeddedChannel controlChannel = new EmbeddedChannel();
+        EmbeddedChannel channel = new EmbeddedChannel(new Http3ControlStreamFrameDispatcher(controlChannel));
         Http3Frame frame = new Http3Frame() { };
         Http3RequestStreamFrame requestStreamFrame = new Http3RequestStreamFrame() { };
         Http3PushStreamFrame pushStreamFrame = new Http3PushStreamFrame() { };
@@ -42,7 +37,19 @@ public class Http3ControlStreamFrameDispatcherTest {
         assertSame(frame, channel.readOutbound());
         assertSame(requestStreamFrame, channel.readOutbound());
         assertSame(pushStreamFrame, channel.readOutbound());
-
         assertFalse(channel.finish());
+        assertFalse(controlChannel.finish());
+    }
+
+    @Test
+    public void testDispatchControlFrame() {
+        EmbeddedChannel controlChannel = new EmbeddedChannel();
+        EmbeddedChannel channel = new EmbeddedChannel(new Http3ControlStreamFrameDispatcher(controlChannel));
+        Http3ControlStreamFrame frame = new Http3ControlStreamFrame() { };
+
+        assertFalse(channel.writeOutbound(frame));
+        assertFalse(channel.finish());
+        assertSame(frame, controlChannel.readOutbound());
+        assertFalse(controlChannel.finish());
     }
 }

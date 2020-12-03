@@ -63,6 +63,8 @@ public final class Http3ServerConnectionHandler extends Http3ConnectionHandler {
         // Add the encoder and decoder in the pipeline so we can handle Http3Frames
         pipeline.addLast(codecSupplier.get());
         pipeline.addLast(new Http3RequestStreamValidationHandler(true));
+        // dispatch Http3ControlStreamFrames to the local control stream.
+        pipeline.addLast(Http3ControlStreamFrameDispatcher.INSTANCE);
         pipeline.addLast(requestStreamHandler);
     }
 }

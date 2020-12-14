@@ -65,7 +65,7 @@ public final class Http3 {
     /**
      * Returns the {@link Supplier} that should be used to obtain a HTTP/3 codec for the underlying connection.
      *
-     * Usually you as an end-user you just want to use {@link Http3RequestStreamInitializer} directly.
+     * As an end-user in most cases you just want to use {@link Http3RequestStreamInitializer} directly.
      *
      * @param channel   the channel for the HTTP/3 connection.
      * @return          the codec supplier.

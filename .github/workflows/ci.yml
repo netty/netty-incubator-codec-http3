@@ -51,7 +51,7 @@ jobs:
 
       - name: Execute project build with leak detection
         if: ${{ github.event_name == 'pull_request' }}
-        run: docker-compose -f docker/docker-compose.centos-8.yaml -f docker/docker-compose.centos-8.18.yaml run leak
+        run: docker-compose -f docker/docker-compose.centos-8.yaml -f docker/docker-compose.centos-8.18.yaml run detect-leak
 
       - name: Deploy to sonatype
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}

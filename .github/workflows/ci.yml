@@ -49,7 +49,7 @@ jobs:
         run: docker-compose -f docker/docker-compose.centos-8.yaml -f docker/docker-compose.centos-8.18.yaml run build
      
       - name: Deploy to sonatype
-        if: ${{ github.event == 'push' }}
+        if: ${{ github.event_name == 'push' }}
         run: docker-compose -f docker/docker-compose.centos-8.yaml -f docker/docker-compose.centos-8.18.yaml run deploy
 
       - uses: actions/upload-artifact@v2

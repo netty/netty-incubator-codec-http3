@@ -40,5 +40,5 @@ jobs:
       - uses: actions/upload-artifact@v2
         if: ${{ failure() }}
         with:
-          name: target
-          path: target/ # or path/to/artifact
+          name: build-surefire-reports
+          path: "**/target/surefire-reports"

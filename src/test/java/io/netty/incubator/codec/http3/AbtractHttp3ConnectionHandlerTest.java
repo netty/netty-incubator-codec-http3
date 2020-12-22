@@ -32,6 +32,7 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -62,7 +63,7 @@ public abstract class AbtractHttp3ConnectionHandlerTest {
         handler.channelRegistered(ctx);
         handler.channelActive(ctx);
 
-        assertEquals(localControlStreamChannel, Http3.getLocalControlStream(quicChannel));
+        assertNotEquals(localControlStreamChannel, Http3.getLocalControlStream(quicChannel));
 
         handler.channelInactive(ctx);
         handler.channelUnregistered(ctx);

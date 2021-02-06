@@ -1,4 +1,4 @@
-name: PR Builder Reports
+name: PR Reports
 on:
   workflow_run:
     workflows: [ "Build PR" ]

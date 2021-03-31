@@ -180,6 +180,11 @@ final class EmbeddedQuicStreamChannel extends EmbeddedChannel implements QuicStr
     }
 
     @Override
+    public ChannelFuture shutdownOutput(ChannelPromise channelPromise) {
+        return shutdownOutput(0, channelPromise);
+    }
+
+    @Override
     public boolean isShutdown() {
         return isInputShutdown() && isOutputShutdown();
     }
@@ -187,11 +192,6 @@ final class EmbeddedQuicStreamChannel extends EmbeddedChannel implements QuicStr
     @Override
     public ChannelFuture shutdown(ChannelPromise promise) {
         return shutdown(0, promise);
-    }
-
-    @Override
-    public ChannelFuture shutdownOutput(ChannelPromise promise) {
-        return shutdownOutput(0, promise);
     }
 
     Integer outputShutdownError() {

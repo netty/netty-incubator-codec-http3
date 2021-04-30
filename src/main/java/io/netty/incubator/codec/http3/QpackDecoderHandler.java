@@ -88,7 +88,8 @@ final class QpackDecoderHandler extends ByteToMessageDecoder {
                 Http3CodecUtils.connectionError(ctx, Http3ErrorCode.QPACK_DECODER_STREAM_ERROR,
                         "Invalid increment '" + increment + "'.",  false);
                 return;
-            } else if (increment < 0) {
+            }
+            if (increment < 0) {
                 return;
             }
             // Do nothing for now

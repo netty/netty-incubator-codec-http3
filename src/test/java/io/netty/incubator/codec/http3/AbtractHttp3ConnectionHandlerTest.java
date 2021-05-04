@@ -40,11 +40,16 @@ public abstract class AbtractHttp3ConnectionHandlerTest {
         handler.channelRegistered(ctx);
         handler.channelActive(ctx);
 
+        final EmbeddedQuicStreamChannel localControlStream = quicChannel.localControlStream();
+        assertNotNull(localControlStream);
+
         assertNotNull(Http3.getLocalControlStream(quicChannel));
 
         handler.channelInactive(ctx);
         handler.channelUnregistered(ctx);
         handler.handlerRemoved(ctx);
+
+        localControlStream.finishAndReleaseAll();
     }
 
     @Test
@@ -60,12 +65,17 @@ public abstract class AbtractHttp3ConnectionHandlerTest {
         handler.channelRegistered(ctx);
         handler.channelActive(ctx);
 
+        final EmbeddedQuicStreamChannel localControlStream = quicChannel.localControlStream();
+        assertNotNull(localControlStream);
+
         handler.channelRead(ctx, bidirectionalStream);
 
         assertBidirectionalStreamHandled(quicChannel, bidirectionalStream);
         handler.channelInactive(ctx);
         handler.channelUnregistered(ctx);
         handler.handlerRemoved(ctx);
+
+        localControlStream.finishAndReleaseAll();
     }
 
     @Test
@@ -80,6 +90,9 @@ public abstract class AbtractHttp3ConnectionHandlerTest {
         handler.channelRegistered(ctx);
         handler.channelActive(ctx);
 
+        final EmbeddedQuicStreamChannel localControlStream = quicChannel.localControlStream();
+        assertNotNull(localControlStream);
+
         handler.channelRead(ctx, unidirectionalStream);
 
         assertNotNull(unidirectionalStream.pipeline().get(Http3UnidirectionalStreamInboundHandler.class));
@@ -87,5 +100,7 @@ public abstract class AbtractHttp3ConnectionHandlerTest {
         handler.channelInactive(ctx);
         handler.channelUnregistered(ctx);
         handler.handlerRemoved(ctx);
+
+        localControlStream.finishAndReleaseAll();
     }
 }

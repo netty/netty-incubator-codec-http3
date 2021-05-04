@@ -117,6 +117,10 @@ final class EmbeddedQuicChannel extends EmbeddedChannel implements QuicChannel {
                 new UnsupportedOperationException("Collect stats not supported for embedded channel."));
     }
 
+    public EmbeddedQuicStreamChannel localControlStream() {
+        return (EmbeddedQuicStreamChannel) Http3.getLocalControlStream(this);
+    }
+
     Collection<Integer> closeErrorCodes() {
         return unmodifiableCollection(closeErrorCodes);
     }

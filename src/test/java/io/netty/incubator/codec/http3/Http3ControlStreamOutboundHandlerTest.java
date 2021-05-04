@@ -52,16 +52,6 @@ public class Http3ControlStreamOutboundHandlerTest extends
         return Arrays.asList(Http3TestUtils.newHttp3RequestStreamFrame(), Http3TestUtils.newHttp3PushStreamFrame());
     }
 
-    @Override
-    public void testValidTypeInbound() {
-        super.testValidTypeInbound();
-    }
-
-    @Override
-    public void testValidTypeOutput() {
-        super.testValidTypeOutput();
-    }
-
     @Test
     public void testStreamClosedWhileParentStillActive() {
         EmbeddedQuicChannel parent = new EmbeddedQuicChannel();

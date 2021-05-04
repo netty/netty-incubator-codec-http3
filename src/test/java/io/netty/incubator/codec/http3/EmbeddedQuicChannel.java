@@ -96,9 +96,8 @@ final class EmbeddedQuicChannel extends EmbeddedChannel implements QuicChannel {
     @Override
     public Future<QuicStreamChannel> createStream(QuicStreamType type, ChannelHandler handler,
                                                   Promise<QuicStreamChannel> promise) {
-        promise.setSuccess(new EmbeddedQuicStreamChannel(this, true, type,
+        return promise.setSuccess(new EmbeddedQuicStreamChannel(this, true, type,
                 streamIdUpdater.getAndAdd(this, 2), handler));
-        return promise;
     }
 
     @Override
@@ -114,8 +113,8 @@ final class EmbeddedQuicChannel extends EmbeddedChannel implements QuicChannel {
 
     @Override
     public Future<QuicConnectionStats> collectStats(Promise<QuicConnectionStats> promise) {
-        promise.setFailure(new UnsupportedOperationException("Collect stats not supported for embedded channel."));
-        return promise;
+        return promise.setFailure(
+                new UnsupportedOperationException("Collect stats not supported for embedded channel."));
     }
 
     Collection<Integer> closeErrorCodes() {

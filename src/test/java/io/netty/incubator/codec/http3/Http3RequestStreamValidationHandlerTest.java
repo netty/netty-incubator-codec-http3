@@ -406,7 +406,8 @@ public class Http3RequestStreamValidationHandlerTest extends Http3FrameTypeValid
         EmbeddedQuicChannel parent = new EmbeddedQuicChannel();
         EmbeddedQuicStreamChannel channel =
                 (EmbeddedQuicStreamChannel) parent.createStream(QuicStreamType.BIDIRECTIONAL,
-                        server ? newServerValidator() : newClientValidator(() -> false)).get();
+                        server ? newServerValidator(qpackAttributes, decoder) :
+                                newClientValidator(() -> false, qpackAttributes, decoder)).get();
 
         for (int i = 0; i < frames.length; i++) {
             Http3Frame frame = frames[i];

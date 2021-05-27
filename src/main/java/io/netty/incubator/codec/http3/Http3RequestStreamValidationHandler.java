@@ -31,8 +31,8 @@ import java.util.function.BooleanSupplier;
 final class Http3RequestStreamValidationHandler extends Http3FrameTypeValidationHandler<Http3RequestStreamFrame> {
     private enum State {
         Initial,
-        HEADERS,
-        DATA,
+        Headers,
+        Data,
         End
     }
     private State readState = State.Initial;
@@ -96,17 +96,13 @@ final class Http3RequestStreamValidationHandler extends Http3FrameTypeValidation
                 } else if (!server) {
                     clientHeadRequest = HttpMethod.HEAD.asciiName().equals(headersFrame.headers().method());
                 }
-                if (isInformationalResponse(inbound, headersFrame)) {
-                    return State.Initial;
-                } else {
-                    return State.HEADERS;
-                }
-            case HEADERS:
+                return isInformationalResponse(inbound, headersFrame) ? State.Initial : State.Headers;
+            case Headers:
                 if (frame instanceof Http3DataFrame) {
                     if (inbound) {
                         verifyContentLength(((Http3DataFrame) frame).content().readableBytes(), false);
                     }
-                    return State.DATA;
+                    return State.Data;
                 }
                 if (frame instanceof Http3HeadersFrame) {
                     if (isInformationalResponse(inbound, (Http3HeadersFrame) frame)) {
@@ -118,7 +114,7 @@ final class Http3RequestStreamValidationHandler extends Http3FrameTypeValidation
                     }
                     return State.End;
                 }
-            case DATA:
+            case Data:
                 if (inbound && frame instanceof Http3DataFrame) {
                     verifyContentLength(((Http3DataFrame) frame).content().readableBytes(), false);
                 }

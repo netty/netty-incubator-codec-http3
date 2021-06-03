@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 The Netty Project
+ * Copyright 2021 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -13,56 +13,41 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
+
 package io.netty.incubator.codec.http3;
 
-import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.util.ReferenceCountUtil;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.StringUtil;
 
-class Http3FrameTypeValidationHandler<T extends Http3Frame> extends ChannelDuplexHandler {
+final class Http3FrameValidationUtils {
 
-    private final Class<T> frameType;
-
-    Http3FrameTypeValidationHandler(Class<T> frameType) {
-        this.frameType = ObjectUtil.checkNotNull(frameType, "frameType");
+    private Http3FrameValidationUtils() {
+        // no instances
     }
 
     @SuppressWarnings("unchecked")
-    private T cast(Object msg) {
+    private static <T> T cast(Object msg) {
         return (T) msg;
     }
 
-    private boolean isValid(Object msg) {
+    private static <T> boolean isValid(Class<T> frameType, Object msg) {
         return frameType.isInstance(msg);
     }
 
-    @Override
-    public final void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-        if (isValid(msg)) {
-            write(ctx, cast(msg), promise);
-        } else {
-            frameTypeUnexpected(promise, msg);
+    static <T> T validateFrameWritten(Class<T> expectedFrameType, Object msg, ChannelPromise promise) {
+        if (isValid(expectedFrameType, msg)) {
+            return cast(msg);
         }
+        return null;
     }
 
-    public void write(ChannelHandlerContext ctx, T msg, ChannelPromise promise) throws Exception {
-        ctx.write(msg, promise);
-    }
-
-    @Override
-    public final void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        if (isValid(msg)) {
-            channelRead(ctx, cast(msg));
-        } else {
-            frameTypeUnexpected(ctx, msg);
+    static <T> T validateFrameRead(Class<T> expectedFrameType, ChannelHandlerContext ctx, Object msg) {
+        if (isValid(expectedFrameType, msg)) {
+            return cast(msg);
         }
-    }
-
-    public void channelRead(ChannelHandlerContext ctx, T frame) throws Exception {
-        ctx.fireChannelRead(frame);
+        return null;
     }
 
     static void frameTypeUnexpected(ChannelPromise promise, Object frame) {
@@ -72,7 +57,7 @@ class Http3FrameTypeValidationHandler<T extends Http3Frame> extends ChannelDuple
                 "Frame of type " + type + " unexpected"));
     }
 
-    void frameTypeUnexpected(ChannelHandlerContext ctx, Object frame) {
+    static void frameTypeUnexpected(ChannelHandlerContext ctx, Object frame) {
         ReferenceCountUtil.release(frame);
         Http3CodecUtils.connectionError(ctx, Http3ErrorCode.H3_FRAME_UNEXPECTED, "Frame type unexpected", true);
     }

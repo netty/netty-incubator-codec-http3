@@ -33,6 +33,8 @@ import static io.netty.incubator.codec.http3.Http3CodecUtils.HTTP3_CONTROL_STREA
 import static io.netty.incubator.codec.http3.Http3CodecUtils.HTTP3_PUSH_STREAM_TYPE;
 import static io.netty.incubator.codec.http3.Http3CodecUtils.HTTP3_QPACK_DECODER_STREAM_TYPE;
 import static io.netty.incubator.codec.http3.Http3CodecUtils.HTTP3_QPACK_ENCODER_STREAM_TYPE;
+import static io.netty.incubator.codec.http3.Http3RequestStreamDecodeState.NO_DECODE_STATE;
+import static io.netty.incubator.codec.http3.Http3RequestStreamEncodeState.NO_ENCODE_STATE;
 
 /**
  * {@link ByteToMessageDecoder} which helps to detect the type of unidirectional stream.
@@ -114,7 +116,8 @@ final class Http3UnidirectionalStreamInboundHandler extends ByteToMessageDecoder
             ctx.pipeline().addLast(localControlStreamHandler);
             // Replace this handler with the codec now.
             ctx.pipeline().replace(this, null,
-                    codecFactory.newCodec(Http3ControlStreamFrameTypeValidator.INSTANCE));
+                    codecFactory.newCodec(Http3ControlStreamFrameTypeValidator.INSTANCE, NO_ENCODE_STATE,
+                            NO_DECODE_STATE));
         } else {
             // Only one control stream is allowed.
             // See https://quicwg.org/base-drafts/draft-ietf-quic-http.html#section-6.2.1
@@ -152,7 +155,8 @@ final class Http3UnidirectionalStreamInboundHandler extends ByteToMessageDecoder
 
                 // Replace this handler with the codec which also validates that only valid frames will be decoded.
                 ctx.pipeline().replace(this, null,
-                        codecFactory.newCodec(Http3PushStreamFrameTypeValidator.NO_VALIDATION));
+                        codecFactory.newCodec(Http3PushStreamFrameTypeValidator.NO_VALIDATION, NO_ENCODE_STATE,
+                                NO_DECODE_STATE));
             }
         }
     }

@@ -19,6 +19,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.http.HttpStatusClass;
+import io.netty.incubator.codec.quic.QuicStreamChannel;
 
 import static io.netty.incubator.codec.http3.Http3FrameValidationUtils.frameTypeUnexpected;
 

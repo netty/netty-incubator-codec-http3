@@ -17,6 +17,8 @@ package io.netty.incubator.codec.http3;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelInboundHandler;
+import io.netty.channel.ChannelOutboundHandler;
 import io.netty.incubator.codec.quic.QuicStreamType;
 import io.netty.util.ReferenceCountUtil;
 import org.junit.After;
@@ -51,11 +53,10 @@ public abstract class AbstractHttp3FrameTypeValidationHandlerTest<T extends Http
 
     protected abstract List<Http3Frame> newInvalidFrames();
 
-    protected AbstractHttp3FrameTypeValidationHandlerTest(QuicStreamType defaultStreamType, boolean isOutbound,
-                                                          boolean isInbound) {
+    protected AbstractHttp3FrameTypeValidationHandlerTest(QuicStreamType defaultStreamType) {
         this.defaultStreamType = defaultStreamType;
-        this.isOutbound = isOutbound;
-        this.isInbound = isInbound;
+        this.isOutbound = this instanceof ChannelOutboundHandler;
+        this.isInbound = this instanceof ChannelInboundHandler;
     }
 
     @Before

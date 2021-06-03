@@ -24,8 +24,10 @@ import io.netty.incubator.codec.quic.QuicChannel;
 import io.netty.incubator.codec.quic.QuicStreamChannel;
 import io.netty.util.CharsetUtil;
 import io.netty.util.internal.ObjectUtil;
+import io.netty.util.internal.StringUtil;
 
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
+import static io.netty.incubator.codec.http3.Http3ErrorCode.H3_INTERNAL_ERROR;
 
 final class Http3CodecUtils {
     static final long DEFAULT_MAX_HEADER_LIST_SIZE = 0xffffffffL;
@@ -216,7 +218,7 @@ final class Http3CodecUtils {
         if (fireException) {
             ctx.fireExceptionCaught(exception);
         }
-        connectionError(ctx, exception.errorCode(), exception.getMessage());
+        connectionError(ctx.channel(), exception.errorCode(), exception.getMessage());
     }
 
     /**
@@ -231,7 +233,7 @@ final class Http3CodecUtils {
          if (fireException) {
              ctx.fireExceptionCaught(new Http3Exception(errorCode, msg));
          }
-         connectionError(ctx, errorCode, msg);
+         connectionError(ctx.channel(), errorCode, msg);
     }
 
     static void closeOnFailure(ChannelFuture future) {
@@ -242,10 +244,9 @@ final class Http3CodecUtils {
         future.addListener(CLOSE_ON_FAILURE);
     }
 
-    private static void connectionError(ChannelHandlerContext ctx, Http3ErrorCode errorCode, String msg) {
+    static void connectionError(Channel channel, Http3ErrorCode errorCode, String msg) {
         final QuicChannel quicChannel;
 
-        Channel channel = ctx.channel();
         if (channel instanceof QuicChannel) {
             quicChannel = (QuicChannel) channel;
         } else {
@@ -270,5 +271,22 @@ final class Http3CodecUtils {
         if (!ctx.channel().config().isAutoRead()) {
             ctx.read();
         }
+    }
+
+    /**
+     * Retrieves {@link Http3ConnectionHandler} from the passed {@link QuicChannel} pipeline or closes the connection if
+     * none available.
+     *
+     * @param ch for which the {@link Http3ConnectionHandler} is to be retrieved.
+     * @return {@link Http3ConnectionHandler} if available, else close the connection and return {@code null}.
+     */
+    static Http3ConnectionHandler getConnectionHandlerOrClose(QuicChannel ch) {
+        Http3ConnectionHandler connectionHandler = ch.pipeline().get(Http3ConnectionHandler.class);
+        if (connectionHandler == null) {
+            connectionError(ch, H3_INTERNAL_ERROR, "Couldn't obtain the " +
+                    StringUtil.simpleClassName(Http3ConnectionHandler.class) + " of the parent Channel");
+            return null;
+        }
+        return connectionHandler;
     }
 }

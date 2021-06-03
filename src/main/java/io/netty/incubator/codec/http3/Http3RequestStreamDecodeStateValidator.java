@@ -18,6 +18,7 @@ package io.netty.incubator.codec.http3;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.incubator.codec.http3.Http3RequestStreamEncodeStateValidator.State;
+import io.netty.incubator.codec.quic.QuicStreamChannel;
 
 import static io.netty.incubator.codec.http3.Http3FrameValidationUtils.frameTypeUnexpected;
 import static io.netty.incubator.codec.http3.Http3RequestStreamEncodeStateValidator.evaluateFrame;

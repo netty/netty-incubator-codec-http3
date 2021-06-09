@@ -31,12 +31,11 @@ import static io.netty.incubator.codec.http3.Http3TestUtils.assertException;
 import static io.netty.incubator.codec.http3.Http3TestUtils.assertFrameReleased;
 import static io.netty.incubator.codec.http3.Http3TestUtils.assertFrameSame;
 import static io.netty.incubator.codec.http3.Http3TestUtils.verifyClose;
-import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeThat;
+import static org.junit.Assume.assumeTrue;
 
 public abstract class AbstractHttp3FrameTypeValidationHandlerTest<T extends Http3Frame> {
 
@@ -80,7 +79,7 @@ public abstract class AbstractHttp3FrameTypeValidationHandlerTest<T extends Http
 
     @Test
     public void testValidTypeInbound() throws Exception {
-        assumeThat(isInbound, is(true));
+        assumeTrue(isInbound);
         final EmbeddedQuicStreamChannel channel = newStream(defaultStreamType, newHandler());
         List<T> validFrames = newValidFrames();
         for (T valid : validFrames) {
@@ -99,7 +98,7 @@ public abstract class AbstractHttp3FrameTypeValidationHandlerTest<T extends Http
 
     @Test
     public void testValidTypeOutbound() throws Exception {
-        assumeThat(isOutbound, is(true));
+        assumeTrue(isOutbound);
         final EmbeddedQuicStreamChannel channel = newStream(defaultStreamType, newHandler());
         List<T> validFrames = newValidFrames();
         for (T valid : validFrames) {
@@ -112,7 +111,7 @@ public abstract class AbstractHttp3FrameTypeValidationHandlerTest<T extends Http
 
     @Test
     public void testInvalidTypeInbound() throws Exception {
-        assumeThat(isInbound, is(true));
+        assumeTrue(isInbound);
         final EmbeddedQuicStreamChannel channel = newStream(defaultStreamType, newHandler());
 
         Http3ErrorCode errorCode = inboundErrorCodeInvalid();
@@ -136,7 +135,7 @@ public abstract class AbstractHttp3FrameTypeValidationHandlerTest<T extends Http
 
     @Test
     public void testInvalidTypeOutbound() throws Exception {
-        assumeThat(isOutbound, is(true));
+        assumeTrue(isOutbound);
         final EmbeddedQuicStreamChannel channel = newStream(defaultStreamType, newHandler());
 
         List<Http3Frame> invalidFrames = newInvalidFrames();

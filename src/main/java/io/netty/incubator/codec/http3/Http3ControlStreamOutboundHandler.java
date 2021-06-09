@@ -92,7 +92,7 @@ final class Http3ControlStreamOutboundHandler
     }
 
     @Override
-    void write(ChannelHandlerContext ctx, Http3ControlStreamFrame msg, ChannelPromise promise) throws Exception {
+    void write(ChannelHandlerContext ctx, Http3ControlStreamFrame msg, ChannelPromise promise) {
         if (msg instanceof Http3MaxPushIdFrame) {
             sentMaxPushId = ((Http3MaxPushIdFrame) msg).id();
         }

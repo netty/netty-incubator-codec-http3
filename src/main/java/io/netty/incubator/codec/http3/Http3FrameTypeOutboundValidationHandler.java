@@ -32,20 +32,20 @@ class Http3FrameTypeOutboundValidationHandler<T extends Http3Frame> extends Chan
     }
 
     @Override
-    public final void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-        T frame = validateFrameWritten(frameType, msg, promise);
+    public final void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+        T frame = validateFrameWritten(frameType, msg);
         if (frame != null) {
             write(ctx, frame, promise);
         } else {
-            writeFrameDiscarded(promise, msg);
+            writeFrameDiscarded(msg, promise);
         }
     }
 
-    void write(ChannelHandlerContext ctx, T msg, ChannelPromise promise) throws Exception {
+    void write(ChannelHandlerContext ctx, T msg, ChannelPromise promise) {
         ctx.write(msg, promise);
     }
 
-    void writeFrameDiscarded(ChannelPromise promise, Object discardedFrame) {
+    void writeFrameDiscarded(Object discardedFrame, ChannelPromise promise) {
         frameTypeUnexpected(promise, discardedFrame);
     }
 }

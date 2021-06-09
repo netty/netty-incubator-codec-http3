@@ -24,7 +24,7 @@ import static io.netty.incubator.codec.http3.Http3FrameValidationUtils.validateF
 
 class Http3FrameTypeInboundValidationHandler<T extends Http3Frame> extends ChannelInboundHandlerAdapter {
 
-    private final Class<T> frameType;
+    protected final Class<T> frameType;
 
     Http3FrameTypeInboundValidationHandler(Class<T> frameType) {
         this.frameType = ObjectUtil.checkNotNull(frameType, "frameType");
@@ -32,11 +32,11 @@ class Http3FrameTypeInboundValidationHandler<T extends Http3Frame> extends Chann
 
     @Override
     public final void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        final T frame = validateFrameRead(frameType, ctx, msg);
+        final T frame = validateFrameRead(frameType, msg);
         if (frame != null) {
             channelRead(ctx, frame);
         } else {
-            frameDiscarded(ctx, msg);
+            readFrameDiscarded(ctx, msg);
         }
     }
 
@@ -44,7 +44,7 @@ class Http3FrameTypeInboundValidationHandler<T extends Http3Frame> extends Chann
         ctx.fireChannelRead(frame);
     }
 
-    void frameDiscarded(ChannelHandlerContext ctx, Object discardedFrame) {
+    void readFrameDiscarded(ChannelHandlerContext ctx, Object discardedFrame) {
         frameTypeUnexpected(ctx, discardedFrame);
     }
 }

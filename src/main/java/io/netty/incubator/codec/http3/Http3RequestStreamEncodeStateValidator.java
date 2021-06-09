@@ -23,14 +23,14 @@ import io.netty.handler.codec.http.HttpStatusClass;
 import static io.netty.incubator.codec.http3.Http3FrameValidationUtils.frameTypeUnexpected;
 
 final class Http3RequestStreamEncodeStateValidator extends ChannelOutboundHandlerAdapter
-        implements Http3RequestStreamEncodeState {
+        implements Http3RequestStreamCodecState {
     enum State {
         None,
         Headers,
         FinalHeaders,
         Trailers
     }
-    private State received = State.None;
+    private State state = State.None;
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
@@ -39,28 +39,28 @@ final class Http3RequestStreamEncodeStateValidator extends ChannelOutboundHandle
             return;
         }
         final Http3RequestStreamFrame frame = (Http3RequestStreamFrame) msg;
-        final State nextState = evaluateFrame(received, frame);
+        final State nextState = evaluateFrame(state, frame);
         if (nextState == null) {
             frameTypeUnexpected(ctx, msg);
             return;
         }
-        received = nextState;
+        state = nextState;
         super.write(ctx, msg, promise);
     }
 
     @Override
     public boolean started() {
-        return isStreamStarted(received);
+        return isStreamStarted(state);
     }
 
     @Override
     public boolean receivedFinalHeaders() {
-        return isFinalHeadersReceived(received);
+        return isFinalHeadersReceived(state);
     }
 
     @Override
     public boolean terminated() {
-        return isTrailersReceived(received);
+        return isTrailersReceived(state);
     }
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 The Netty Project
+ * Copyright 2020 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -13,7 +13,6 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-
 package io.netty.incubator.codec.http3;
 
 import io.netty.channel.ChannelHandlerContext;
@@ -36,20 +35,44 @@ final class Http3FrameValidationUtils {
         return frameType.isInstance(msg);
     }
 
-    static <T> T validateFrameWritten(Class<T> expectedFrameType, Object msg, ChannelPromise promise) {
+    /**
+     * Check if the passed {@code msg} is of the {@code expectedFrameType} and return the expected type, else return
+     * {@code null}.
+     *
+     * @param expectedFrameType {@link Class} of the expected frame type.
+     * @param msg to validate.
+     * @param <T> Expected type.
+     * @return {@code msg} as expected frame type or {@code null} if it can not be converted to the expected type.
+     */
+    static <T> T validateFrameWritten(Class<T> expectedFrameType, Object msg) {
         if (isValid(expectedFrameType, msg)) {
             return cast(msg);
         }
         return null;
     }
 
-    static <T> T validateFrameRead(Class<T> expectedFrameType, ChannelHandlerContext ctx, Object msg) {
+    /**
+     * Check if the passed {@code msg} is of the {@code expectedFrameType} and return the expected type, else return
+     * {@code null}.
+     *
+     * @param expectedFrameType {@link Class} of the expected frame type.
+     * @param msg to validate.
+     * @param <T> Expected type.
+     * @return {@code msg} as expected frame type or {@code null} if it can not be converted to the expected type.
+     */
+    static <T> T validateFrameRead(Class<T> expectedFrameType, Object msg) {
         if (isValid(expectedFrameType, msg)) {
             return cast(msg);
         }
         return null;
     }
 
+    /**
+     * Handle unexpected frame type by failing the passed {@link ChannelPromise}.
+     *
+     * @param promise to fail.
+     * @param frame which is unexpected.
+     */
     static void frameTypeUnexpected(ChannelPromise promise, Object frame) {
         String type = StringUtil.simpleClassName(frame);
         ReferenceCountUtil.release(frame);
@@ -57,6 +80,13 @@ final class Http3FrameValidationUtils {
                 "Frame of type " + type + " unexpected"));
     }
 
+    /**
+     * Handle unexpected frame type by propagating a connection error with code:
+     * {@link Http3ErrorCode#H3_FRAME_UNEXPECTED}.
+     *
+     * @param ctx to use for propagation of failure.
+     * @param frame which is unexpected.
+     */
     static void frameTypeUnexpected(ChannelHandlerContext ctx, Object frame) {
         ReferenceCountUtil.release(frame);
         Http3CodecUtils.connectionError(ctx, Http3ErrorCode.H3_FRAME_UNEXPECTED, "Frame type unexpected", true);

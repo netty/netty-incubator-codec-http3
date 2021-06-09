@@ -36,31 +36,31 @@ final class Http3RequestStreamValidationHandler extends Http3FrameTypeDuplexVali
     private final BooleanSupplier goAwayReceivedSupplier;
     private final QpackAttributes qpackAttributes;
     private final QpackDecoder qpackDecoder;
-    private final Http3RequestStreamDecodeState decodeState;
-    private final Http3RequestStreamEncodeState encodeState;
+    private final Http3RequestStreamCodecState decodeState;
+    private final Http3RequestStreamCodecState encodeState;
 
     private boolean clientHeadRequest;
     private long expectedLength = -1;
     private long seenLength;
 
     static Http3RequestStreamValidationHandler newServerValidator(
-            QpackAttributes qpackAttributes, QpackDecoder decoder, Http3RequestStreamEncodeState encodeState,
-            Http3RequestStreamDecodeState decodeState) {
+            QpackAttributes qpackAttributes, QpackDecoder decoder, Http3RequestStreamCodecState encodeState,
+            Http3RequestStreamCodecState decodeState) {
         return new Http3RequestStreamValidationHandler(true, () -> false, qpackAttributes, decoder,
                 encodeState, decodeState);
     }
 
     static Http3RequestStreamValidationHandler newClientValidator(
             BooleanSupplier goAwayReceivedSupplier, QpackAttributes qpackAttributes, QpackDecoder decoder,
-            Http3RequestStreamEncodeState encodeState, Http3RequestStreamDecodeState decodeState) {
+            Http3RequestStreamCodecState encodeState, Http3RequestStreamCodecState decodeState) {
         return new Http3RequestStreamValidationHandler(false, goAwayReceivedSupplier, qpackAttributes, decoder,
                 encodeState, decodeState);
     }
 
     private Http3RequestStreamValidationHandler(boolean server, BooleanSupplier goAwayReceivedSupplier,
                                                 QpackAttributes qpackAttributes, QpackDecoder qpackDecoder,
-                                                Http3RequestStreamEncodeState encodeState,
-                                                Http3RequestStreamDecodeState decodeState) {
+                                                Http3RequestStreamCodecState encodeState,
+                                                Http3RequestStreamCodecState decodeState) {
         super(Http3RequestStreamFrame.class);
         this.server = server;
         this.goAwayReceivedSupplier = goAwayReceivedSupplier;
@@ -110,18 +110,18 @@ final class Http3RequestStreamValidationHandler extends Http3FrameTypeDuplexVali
         if (frame instanceof Http3HeadersFrame) {
             Http3HeadersFrame headersFrame = (Http3HeadersFrame) frame;
             if (headersFrame.headers().contains(HttpHeaderNames.CONNECTION)) {
-                headerUnexpected(ctx, frame, "connection header included");
+                headerUnexpected(ctx, frame, "connection header not allowed");
                 return;
             }
             CharSequence value = headersFrame.headers().get(HttpHeaderNames.TE);
             if (value != null && !HttpHeaderValues.TRAILERS.equals(value)) {
-                headerUnexpected(ctx, frame, "te header field included with invalid value: " + value);
+                headerUnexpected(ctx, frame, "te header field contains an invalid value: " + value);
                 return;
             }
             if (decodeState.receivedFinalHeaders()) {
                 long length = normalizeAndGetContentLength(
                         headersFrame.headers().getAll(HttpHeaderNames.CONTENT_LENGTH), false, true);
-                if (length != -1) {
+                if (length >= 0) {
                     headersFrame.headers().setLong(HttpHeaderNames.CONTENT_LENGTH, length);
                     expectedLength = length;
                 }

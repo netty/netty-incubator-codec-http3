@@ -75,7 +75,7 @@ final class Http3ControlStreamInboundHandler extends Http3FrameTypeInboundValida
     }
 
     @Override
-    void frameDiscarded(ChannelHandlerContext ctx, Object discardedFrame) {
+    void readFrameDiscarded(ChannelHandlerContext ctx, Object discardedFrame) {
         if (!firstFrameRead && !(discardedFrame instanceof Http3SettingsFrame)) {
             Http3CodecUtils.connectionError(ctx, Http3ErrorCode.H3_MISSING_SETTINGS,
                     "Missing settings frame.", forwardControlFrames());

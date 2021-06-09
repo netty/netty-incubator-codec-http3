@@ -58,8 +58,8 @@ final class Http3FrameCodec extends ByteToMessageDecoder implements ChannelOutbo
     private final long maxHeaderListSize;
     private final QpackDecoder qpackDecoder;
     private final QpackEncoder qpackEncoder;
-    private final Http3RequestStreamEncodeState encodeState;
-    private final Http3RequestStreamDecodeState decodeState;
+    private final Http3RequestStreamCodecState encodeState;
+    private final Http3RequestStreamCodecState decodeState;
 
     private boolean firstFrame = true;
     private boolean error;
@@ -79,8 +79,8 @@ final class Http3FrameCodec extends ByteToMessageDecoder implements ChannelOutbo
     }
 
     Http3FrameCodec(Http3FrameTypeValidator validator, QpackDecoder qpackDecoder,
-                    long maxHeaderListSize, QpackEncoder qpackEncoder, Http3RequestStreamEncodeState encodeState,
-                    Http3RequestStreamDecodeState decodeState) {
+                    long maxHeaderListSize, QpackEncoder qpackEncoder, Http3RequestStreamCodecState encodeState,
+                    Http3RequestStreamCodecState decodeState) {
         this.validator = checkNotNull(validator, "validator");
         this.qpackDecoder = checkNotNull(qpackDecoder, "qpackDecoder");
         this.maxHeaderListSize = checkPositive(maxHeaderListSize, "maxHeaderListSize");
@@ -734,7 +734,7 @@ final class Http3FrameCodec extends ByteToMessageDecoder implements ChannelOutbo
          * @param decodeState for the request stream.
          * @return new codec instance for the passed {@code streamType}.
          */
-        ChannelHandler newCodec(Http3FrameTypeValidator validator, Http3RequestStreamEncodeState encodeState,
-                                Http3RequestStreamDecodeState decodeState);
+        ChannelHandler newCodec(Http3FrameTypeValidator validator, Http3RequestStreamCodecState encodeState,
+                                Http3RequestStreamCodecState decodeState);
     }
 }

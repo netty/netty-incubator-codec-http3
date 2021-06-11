@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 The Netty Project
+ * Copyright 2021 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -18,7 +18,6 @@ package io.netty.incubator.codec.http3;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.ChannelInputShutdownReadComplete;
 
-import static io.netty.incubator.codec.http3.Http3RequestStreamValidationUtils.CONTENT_LENGTH_NOT_MODIFIED;
 import static io.netty.incubator.codec.http3.Http3RequestStreamValidationUtils.INVALID_FRAME_READ;
 import static io.netty.incubator.codec.http3.Http3RequestStreamValidationUtils.sendStreamAbandonedIfRequired;
 import static io.netty.incubator.codec.http3.Http3RequestStreamValidationUtils.validateDataFrameRead;

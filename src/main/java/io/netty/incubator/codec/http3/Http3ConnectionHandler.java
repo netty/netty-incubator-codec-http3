@@ -26,7 +26,6 @@ import io.netty.incubator.codec.quic.QuicStreamType;
 import java.util.function.LongFunction;
 
 import static io.netty.incubator.codec.http3.Http3RequestStreamCodecState.NO_STATE;
-import static io.netty.incubator.codec.http3.Http3SettingsFrame.HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY;
 
 /**
  * Handler that handles <a href="https://tools.ietf.org/html/draft-ietf-quic-http-32">HTTP3</a> connections.

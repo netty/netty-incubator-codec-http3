@@ -19,13 +19,11 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.socket.ChannelInputShutdownReadComplete;
-import io.netty.incubator.codec.quic.QuicStreamChannel;
 
 import java.util.function.BooleanSupplier;
 
 import static io.netty.handler.codec.http.HttpMethod.HEAD;
 import static io.netty.incubator.codec.http3.Http3FrameValidationUtils.frameTypeUnexpected;
-import static io.netty.incubator.codec.http3.Http3RequestStreamValidationUtils.CONTENT_LENGTH_NOT_MODIFIED;
 import static io.netty.incubator.codec.http3.Http3RequestStreamValidationUtils.INVALID_FRAME_READ;
 import static io.netty.incubator.codec.http3.Http3RequestStreamValidationUtils.sendStreamAbandonedIfRequired;
 import static io.netty.incubator.codec.http3.Http3RequestStreamValidationUtils.validateClientWrite;

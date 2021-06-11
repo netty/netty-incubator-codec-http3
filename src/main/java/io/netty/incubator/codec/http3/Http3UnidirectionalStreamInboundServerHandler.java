@@ -23,7 +23,7 @@ import io.netty.incubator.codec.http3.Http3FrameCodec.Http3FrameCodecFactory;
 import java.util.function.LongFunction;
 import java.util.function.Supplier;
 
-public class Http3UnidirectionalStreamInboundServerHandler extends Http3UnidirectionalStreamInboundHandler {
+final class Http3UnidirectionalStreamInboundServerHandler extends Http3UnidirectionalStreamInboundHandler {
 
     Http3UnidirectionalStreamInboundServerHandler(Http3FrameCodecFactory codecFactory,
                                                   Http3ControlStreamInboundHandler localControlStreamHandler,

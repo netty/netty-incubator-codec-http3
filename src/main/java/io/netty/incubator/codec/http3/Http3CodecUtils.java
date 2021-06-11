@@ -223,6 +223,7 @@ final class Http3CodecUtils {
 
     /**
      * A connection-error should be handled as defined in the HTTP3 spec.
+     *
      * @param ctx           the {@link ChannelHandlerContext} of the handle that handles it.
      * @param errorCode     the {@link Http3ErrorCode} that caused the error.
      * @param msg           the message that should be used as reason for the error, may be {@code null}.
@@ -236,6 +237,11 @@ final class Http3CodecUtils {
          connectionError(ctx.channel(), errorCode, msg);
     }
 
+    /**
+     * Closes the channel if the passed {@link ChannelFuture} fails or has already failed.
+     *
+     * @param future {@link ChannelFuture} which if fails will close the channel.
+     */
     static void closeOnFailure(ChannelFuture future) {
         if (future.isDone() && !future.isSuccess()) {
             future.channel().close();
@@ -244,6 +250,13 @@ final class Http3CodecUtils {
         future.addListener(CLOSE_ON_FAILURE);
     }
 
+    /**
+     * A connection-error should be handled as defined in the HTTP3 spec.
+     *
+     * @param channel       the {@link Channel} on which error has occured.
+     * @param errorCode     the {@link Http3ErrorCode} that caused the error.
+     * @param msg           the message that should be used as reason for the error, may be {@code null}.
+     */
     static void connectionError(Channel channel, Http3ErrorCode errorCode, String msg) {
         final QuicChannel quicChannel;
 

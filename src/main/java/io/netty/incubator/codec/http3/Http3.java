@@ -164,13 +164,12 @@ public final class Http3 {
     private static Http3RequestStreamInitializer requestStreamInitializer(ChannelHandler handler) {
         if (handler instanceof Http3RequestStreamInitializer) {
             return (Http3RequestStreamInitializer) handler;
-        } else {
-            return new Http3RequestStreamInitializer() {
-                @Override
-                protected void initRequestStream(QuicStreamChannel ch) {
-                    ch.pipeline().addLast(handler);
-                }
-            };
         }
+        return new Http3RequestStreamInitializer() {
+            @Override
+            protected void initRequestStream(QuicStreamChannel ch) {
+                ch.pipeline().addLast(handler);
+            }
+        };
     }
 }

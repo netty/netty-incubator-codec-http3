@@ -30,7 +30,6 @@ import io.netty.util.concurrent.Promise;
 
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLongFieldUpdater;
-import java.util.function.LongSupplier;
 import java.util.function.UnaryOperator;
 
 import static io.netty.incubator.codec.http3.Http3.maxPushIdReceived;
@@ -59,10 +58,21 @@ public final class Http3ServerPushStreamManager {
 
     private volatile long nextId;
 
+    /**
+     * Creates a new instance.
+     *
+     * @param channel for which this manager is created.
+     */
     public Http3ServerPushStreamManager(QuicChannel channel) {
         this(channel, 8);
     }
 
+    /**
+     * Creates a new instance.
+     *
+     * @param channel for which this manager is created.
+     * @param initialPushStreamsCountHint a hint for the number of push streams that may be created.
+     */
     public Http3ServerPushStreamManager(QuicChannel channel, int initialPushStreamsCountHint) {
         this.channel = requireNonNull(channel);
         pushStreams = newConcurrentHashMap(initialPushStreamsCountHint);

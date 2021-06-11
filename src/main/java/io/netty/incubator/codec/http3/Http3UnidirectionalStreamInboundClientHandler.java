@@ -18,19 +18,12 @@ package io.netty.incubator.codec.http3;
 
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandler;
 import io.netty.incubator.codec.http3.Http3FrameCodec.Http3FrameCodecFactory;
 
-import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.Supplier;
 
-import static io.netty.incubator.codec.http3.Http3FrameTypeValidator.NO_VALIDATION;
-import static io.netty.incubator.codec.http3.Http3RequestStreamDecodeState.NO_DECODE_STATE;
-import static io.netty.incubator.codec.http3.Http3RequestStreamEncodeState.NO_ENCODE_STATE;
-
-public class Http3UnidirectionalStreamInboundClientHandler extends Http3UnidirectionalStreamInboundHandler {
+final class Http3UnidirectionalStreamInboundClientHandler extends Http3UnidirectionalStreamInboundHandler {
     private final LongFunction<ChannelHandler> pushStreamHandlerFactory;
 
     Http3UnidirectionalStreamInboundClientHandler(

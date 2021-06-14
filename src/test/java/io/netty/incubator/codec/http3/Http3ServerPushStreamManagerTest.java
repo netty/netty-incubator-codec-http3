@@ -48,6 +48,7 @@ public class Http3ServerPushStreamManagerTest {
     private Http3ServerPushStreamManager manager;
     private Http3ServerConnectionHandler connectionHandler;
     private ChannelHandlerContext controlStreamHandlerCtx;
+    private EmbeddedQuicStreamChannel localControlStream;
 
     @Before
     public void setUp() throws Exception {
@@ -61,10 +62,12 @@ public class Http3ServerPushStreamManagerTest {
             protected void channelRead(ChannelHandlerContext ctx, Http3DataFrame frame, boolean isLast) {
                 ReferenceCountUtil.release(frame);
             }
-        });
+        }, null, null, null, true);
         channel = new EmbeddedQuicChannel(connectionHandler);
-        final QuicStreamChannel localControlStream = Http3.getLocalControlStream(channel);
+        localControlStream = (EmbeddedQuicStreamChannel) Http3.getLocalControlStream(channel);
         assertNotNull(localControlStream);
+        assertTrue(localControlStream.releaseOutbound()); // settings
+
         controlStreamHandlerCtx = mock(ChannelHandlerContext.class);
         when(controlStreamHandlerCtx.channel()).thenReturn(localControlStream);
         connectionHandler.localControlStreamHandler.channelRead(controlStreamHandlerCtx,
@@ -74,6 +77,7 @@ public class Http3ServerPushStreamManagerTest {
 
     @After
     public void tearDown() {
+        assertFalse(localControlStream.finish());
         assertFalse(channel.finish());
     }
 

@@ -47,12 +47,14 @@ public class Http3PushStreamTest {
     private EmbeddedQuicChannel clientChannel;
     private int maxPushId;
     private ChannelHandlerContext serverControlStreamHandlerCtx;
+    private EmbeddedQuicStreamChannel serverLocalControlStream;
+    private EmbeddedQuicStreamChannel clientLocalControlStream;
 
     @Before
     public void setUp() throws Exception {
         serverConnectionHandler = new Http3ServerConnectionHandler(new ChannelDuplexHandler(), null, null, null, true);
         serverChannel = new EmbeddedQuicChannel(serverConnectionHandler);
-        final QuicStreamChannel serverLocalControlStream = Http3.getLocalControlStream(serverChannel);
+        serverLocalControlStream = (EmbeddedQuicStreamChannel) Http3.getLocalControlStream(serverChannel);
         assertNotNull(serverLocalControlStream);
         serverControlStreamHandlerCtx = mock(ChannelHandlerContext.class);
         when(serverControlStreamHandlerCtx.channel()).thenReturn(serverLocalControlStream);
@@ -63,7 +65,11 @@ public class Http3PushStreamTest {
 
         clientConnectionHandler = new Http3ClientConnectionHandler(null, null, null, null, true);
         clientChannel = new EmbeddedQuicChannel(clientConnectionHandler);
+        clientLocalControlStream = (EmbeddedQuicStreamChannel) Http3.getLocalControlStream(clientChannel);
+        assertNotNull(clientLocalControlStream);
 
+        assertTrue(serverLocalControlStream.releaseOutbound());
+        assertTrue(clientLocalControlStream.releaseOutbound());
         maxPushId = 0; // allow 1 push
         sendMaxPushId(maxPushId);
     }
@@ -73,14 +79,16 @@ public class Http3PushStreamTest {
         serverConnectionHandler.localControlStreamHandler.channelRead(serverControlStreamHandlerCtx, maxPushIdFrame);
         assertTrue(serverChannel.isActive());
 
-        final QuicStreamChannel clientLocalControlStream = Http3.getLocalControlStream(clientChannel);
         clientLocalControlStream.writeAndFlush(maxPushIdFrame).addListener(CLOSE_ON_FAILURE);
         assertTrue(clientChannel.isActive());
+        assertTrue(clientLocalControlStream.releaseOutbound());
     }
 
     @After
     public void tearDown() {
+        assertFalse(serverLocalControlStream.finish());
         assertFalse(serverChannel.finish());
+        assertFalse(clientLocalControlStream.finish());
         assertFalse(clientChannel.finish());
     }
 

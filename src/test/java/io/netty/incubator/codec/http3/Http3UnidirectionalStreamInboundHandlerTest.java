@@ -153,9 +153,14 @@ public class Http3UnidirectionalStreamInboundHandlerTest {
     }
 
     private void testPushStream(long maxPushId) throws Exception {
-        EmbeddedQuicChannel parent = new EmbeddedQuicChannel(server ?
+        assertFalse(parent.finish());
+        parent = new EmbeddedQuicChannel(server ?
                 new Http3ServerConnectionHandler(new ChannelInboundHandlerAdapter()) :
                 new Http3ClientConnectionHandler());
+        final EmbeddedQuicStreamChannel localControlStream =
+                (EmbeddedQuicStreamChannel) Http3.getLocalControlStream(parent);
+        assertNotNull(localControlStream);
+        assertTrue(localControlStream.releaseOutbound());
         EmbeddedQuicStreamChannel outboundControlChannel =
                 (EmbeddedQuicStreamChannel) parent.createStream(QuicStreamType.BIDIRECTIONAL,
                         remoteControlStreamHandler).get();

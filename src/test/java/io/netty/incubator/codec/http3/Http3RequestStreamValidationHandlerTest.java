@@ -16,20 +16,31 @@
 package io.netty.incubator.codec.http3;
 
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.ChannelInputShutdownReadComplete;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.incubator.codec.quic.QuicStreamChannel;
 import io.netty.incubator.codec.quic.QuicStreamType;
 import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 
+import static io.netty.handler.codec.http.HttpResponseStatus.CONTINUE;
+import static io.netty.handler.codec.http.HttpResponseStatus.OK;
+import static io.netty.incubator.codec.http3.Http3ErrorCode.H3_FRAME_UNEXPECTED;
+import static io.netty.incubator.codec.http3.Http3RequestStreamValidationHandler.newClientValidator;
+import static io.netty.incubator.codec.http3.Http3RequestStreamValidationHandler.newServerValidator;
 import static io.netty.incubator.codec.http3.Http3TestUtils.assertException;
 import static io.netty.incubator.codec.http3.Http3TestUtils.assertFrameEquals;
 import static io.netty.incubator.codec.http3.Http3TestUtils.verifyClose;
+import static io.netty.util.ReferenceCountUtil.release;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -37,9 +48,26 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 public class Http3RequestStreamValidationHandlerTest extends Http3FrameTypeValidationHandlerTest {
+    private final QpackDecoder decoder;
+
+    public Http3RequestStreamValidationHandlerTest() {
+        super(true, true);
+        decoder = new QpackDecoder(new DefaultHttp3SettingsFrame());
+    }
+
     @Override
-    protected Http3FrameTypeValidationHandler<Http3RequestStreamFrame> newHandler() {
-        return Http3RequestStreamValidationHandler.newServerValidator();
+    protected ChannelHandler newHandler() {
+        return new ChannelInitializer<QuicStreamChannel>() {
+            @Override
+            protected void initChannel(QuicStreamChannel ch) {
+                Http3RequestStreamEncodeStateValidator encStateValidator = new Http3RequestStreamEncodeStateValidator();
+                Http3RequestStreamDecodeStateValidator decStateValidator = new Http3RequestStreamDecodeStateValidator();
+                ch.pipeline().addLast(encStateValidator);
+                ch.pipeline().addLast(decStateValidator);
+                ch.pipeline().addLast(newServerValidator(qpackAttributes, decoder, encStateValidator,
+                        decStateValidator));
+            }
+        };
     }
 
     @Override
@@ -50,26 +78,22 @@ public class Http3RequestStreamValidationHandlerTest extends Http3FrameTypeValid
 
     @Test
     public void testInvalidFrameSequenceStartInbound() throws Exception {
-        EmbeddedQuicChannel parent = new EmbeddedQuicChannel();
-        final EmbeddedQuicStreamChannel channel =
-                (EmbeddedQuicStreamChannel) parent.createStream(QuicStreamType.BIDIRECTIONAL, newHandler()).get();
+        final EmbeddedQuicStreamChannel channel = newStream(QuicStreamType.BIDIRECTIONAL, newHandler());
         Http3DataFrame dataFrame = new DefaultHttp3DataFrame(Unpooled.buffer());
         try {
             channel.writeInbound(dataFrame);
             fail();
         } catch (Exception e) {
-            assertException(Http3ErrorCode.H3_FRAME_UNEXPECTED, e);
+            assertException(H3_FRAME_UNEXPECTED, e);
         }
-        verifyClose(Http3ErrorCode.H3_FRAME_UNEXPECTED, parent);
+        verifyClose(H3_FRAME_UNEXPECTED, parent);
         assertEquals(0, dataFrame.refCnt());
         assertFalse(channel.finish());
     }
 
     @Test
     public void testInvalidFrameSequenceEndInbound() throws Exception {
-        EmbeddedQuicChannel parent = new EmbeddedQuicChannel();
-        final EmbeddedQuicStreamChannel channel =
-                (EmbeddedQuicStreamChannel) parent.createStream(QuicStreamType.BIDIRECTIONAL, newHandler()).get();
+        final EmbeddedQuicStreamChannel channel = newStream(QuicStreamType.BIDIRECTIONAL, newHandler());
 
         Http3HeadersFrame headersFrame = new DefaultHttp3HeadersFrame();
         Http3DataFrame dataFrame = new DefaultHttp3DataFrame(Unpooled.buffer());
@@ -85,10 +109,10 @@ public class Http3RequestStreamValidationHandlerTest extends Http3FrameTypeValid
             channel.writeInbound(dataFrame3);
             fail();
         } catch (Exception e) {
-            assertException(Http3ErrorCode.H3_FRAME_UNEXPECTED, e);
+            assertException(H3_FRAME_UNEXPECTED, e);
         }
 
-        verifyClose(Http3ErrorCode.H3_FRAME_UNEXPECTED, parent);
+        verifyClose(H3_FRAME_UNEXPECTED, parent);
         assertTrue(channel.finish());
         assertEquals(0, dataFrame3.refCnt());
 
@@ -100,23 +124,23 @@ public class Http3RequestStreamValidationHandlerTest extends Http3FrameTypeValid
     }
 
     @Test
-    public void testInvalidFrameSequenceStartOutbound() {
-        EmbeddedQuicStreamChannel channel = new EmbeddedQuicStreamChannel(newHandler());
+    public void testInvalidFrameSequenceStartOutbound() throws Exception {
+        EmbeddedQuicStreamChannel channel = newStream(QuicStreamType.BIDIRECTIONAL, newHandler());
 
         Http3DataFrame dataFrame = new DefaultHttp3DataFrame(Unpooled.buffer());
         try {
             channel.writeOutbound(dataFrame);
             fail();
         } catch (Exception e) {
-            assertException(Http3ErrorCode.H3_FRAME_UNEXPECTED, e);
+            assertException(H3_FRAME_UNEXPECTED, e);
         }
         assertFalse(channel.finish());
         assertEquals(0, dataFrame.refCnt());
     }
 
     @Test
-    public void testInvalidFrameSequenceEndOutbound() {
-        EmbeddedQuicStreamChannel channel = new EmbeddedQuicStreamChannel(newHandler());
+    public void testInvalidFrameSequenceEndOutbound() throws Exception {
+        EmbeddedQuicStreamChannel channel = newStream(QuicStreamType.BIDIRECTIONAL, newHandler());
 
         Http3HeadersFrame headersFrame = new DefaultHttp3HeadersFrame();
         Http3DataFrame dataFrame = new DefaultHttp3DataFrame(Unpooled.buffer());
@@ -132,7 +156,7 @@ public class Http3RequestStreamValidationHandlerTest extends Http3FrameTypeValid
             channel.writeOutbound(dat3Frame3);
             fail();
         } catch (Exception e) {
-            assertException(Http3ErrorCode.H3_FRAME_UNEXPECTED, e);
+            assertException(H3_FRAME_UNEXPECTED, e);
         }
         assertTrue(channel.finish());
         assertEquals(0, dat3Frame3.refCnt());
@@ -145,16 +169,15 @@ public class Http3RequestStreamValidationHandlerTest extends Http3FrameTypeValid
     }
 
     @Test
-    public void testGoawayReceivedBeforeWritingHeaders() {
-        EmbeddedQuicStreamChannel channel = new EmbeddedQuicStreamChannel(
-                Http3RequestStreamValidationHandler.newClientValidator(() -> true));
+    public void testGoawayReceivedBeforeWritingHeaders() throws Exception {
+        EmbeddedQuicStreamChannel channel = newClientStream(() -> true);
 
         Http3HeadersFrame headersFrame = new DefaultHttp3HeadersFrame();
         try {
             channel.writeOutbound(headersFrame);
             fail();
         } catch (Exception e) {
-            assertException(Http3ErrorCode.H3_FRAME_UNEXPECTED, e);
+            assertException(H3_FRAME_UNEXPECTED, e);
         }
         // We should have closed the channel.
         assertFalse(channel.isActive());
@@ -163,10 +186,9 @@ public class Http3RequestStreamValidationHandlerTest extends Http3FrameTypeValid
     }
 
     @Test
-    public void testGoawayReceivedAfterWritingHeaders() {
+    public void testGoawayReceivedAfterWritingHeaders() throws Exception {
         AtomicBoolean goAway = new AtomicBoolean();
-        EmbeddedQuicStreamChannel channel = new EmbeddedQuicStreamChannel(
-                Http3RequestStreamValidationHandler.newClientValidator(goAway::get));
+        EmbeddedQuicStreamChannel channel = newClientStream(goAway::get);
 
         Http3HeadersFrame headersFrame = new DefaultHttp3HeadersFrame();
         Http3DataFrame dataFrame = new DefaultHttp3DataFrame(Unpooled.buffer());
@@ -181,9 +203,8 @@ public class Http3RequestStreamValidationHandlerTest extends Http3FrameTypeValid
     }
 
     @Test
-    public void testClientHeadRequestWithContentLength() {
-        EmbeddedQuicStreamChannel channel = new EmbeddedQuicStreamChannel(
-                Http3RequestStreamValidationHandler.newClientValidator(() -> false));
+    public void testClientHeadRequestWithContentLength() throws Exception {
+        EmbeddedQuicStreamChannel channel = newClientStream(() -> false);
 
         Http3HeadersFrame headersFrame = new DefaultHttp3HeadersFrame();
         headersFrame.headers().method(HttpMethod.HEAD.asciiName());
@@ -199,28 +220,27 @@ public class Http3RequestStreamValidationHandlerTest extends Http3FrameTypeValid
     }
 
     @Test
-    public void testClientNonHeadRequestWithContentLengthNoData() {
+    public void testClientNonHeadRequestWithContentLengthNoData() throws Exception {
         testClientNonHeadRequestWithContentLength(true, false);
     }
 
     @Test
-    public void testClientNonHeadRequestWithContentLengthNoDataAndTrailers() {
+    public void testClientNonHeadRequestWithContentLengthNoDataAndTrailers() throws Exception {
         testClientNonHeadRequestWithContentLength(true, true);
     }
 
     @Test
-    public void testClientNonHeadRequestWithContentLengthNotEnoughData() {
+    public void testClientNonHeadRequestWithContentLengthNotEnoughData() throws Exception {
         testClientNonHeadRequestWithContentLength(false, false);
     }
 
     @Test
-    public void testClientNonHeadRequestWithContentLengthNotEnoughDataAndTrailer() {
+    public void testClientNonHeadRequestWithContentLengthNotEnoughDataAndTrailer() throws Exception {
         testClientNonHeadRequestWithContentLength(false, true);
     }
 
-    private static void testClientNonHeadRequestWithContentLength(boolean noData, boolean trailers) {
-        EmbeddedQuicStreamChannel channel = new EmbeddedQuicStreamChannel(
-                Http3RequestStreamValidationHandler.newClientValidator(() -> false));
+    private void testClientNonHeadRequestWithContentLength(boolean noData, boolean trailers) throws Exception {
+        EmbeddedQuicStreamChannel channel = newClientStream(() -> false);
 
         Http3HeadersFrame headersFrame = new DefaultHttp3HeadersFrame();
         headersFrame.headers().method(HttpMethod.GET.asciiName());
@@ -247,28 +267,28 @@ public class Http3RequestStreamValidationHandlerTest extends Http3FrameTypeValid
     }
 
     @Test
-    public void testServerWithContentLengthNoData() {
+    public void testServerWithContentLengthNoData() throws Exception {
         testServerWithContentLength(true, false);
     }
 
     @Test
-    public void testServerWithContentLengthNoDataAndTrailers() {
+    public void testServerWithContentLengthNoDataAndTrailers() throws Exception {
         testServerWithContentLength(true, true);
     }
 
     @Test
-    public void testServerWithContentLengthNotEnoughData() {
+    public void testServerWithContentLengthNotEnoughData() throws Exception {
         testServerWithContentLength(false, false);
     }
 
     @Test
-    public void testServerWithContentLengthNotEnoughDataAndTrailer() {
+    public void testServerWithContentLengthNotEnoughDataAndTrailer() throws Exception {
         testServerWithContentLength(false, true);
     }
 
-    private static void testServerWithContentLength(boolean noData, boolean trailers) {
-        EmbeddedQuicStreamChannel channel = new EmbeddedQuicStreamChannel(
-                Http3RequestStreamValidationHandler.newServerValidator());
+    private void testServerWithContentLength(boolean noData, boolean trailers) throws Exception {
+        EmbeddedQuicStreamChannel channel = newServerStream();
+
         Http3HeadersFrame headersFrame = new DefaultHttp3HeadersFrame();
         headersFrame.headers().setLong(HttpHeaderNames.CONTENT_LENGTH, 10);
         headersFrame.headers().method(HttpMethod.POST.asciiName());
@@ -291,29 +311,145 @@ public class Http3RequestStreamValidationHandlerTest extends Http3FrameTypeValid
     }
 
     @Test
-    public void testHttp3HeadersFrameWithConnectionHeader() {
+    public void testHttp3HeadersFrameWithConnectionHeader() throws Exception {
         Http3HeadersFrame headersFrame = new DefaultHttp3HeadersFrame();
         headersFrame.headers().add(HttpHeaderNames.CONNECTION, "something");
         testHeadersFrame(headersFrame, Http3ErrorCode.H3_MESSAGE_ERROR);
     }
 
     @Test
-    public void testHttp3HeadersFrameWithTeHeaderAndInvalidValue() {
+    public void testHttp3HeadersFrameWithTeHeaderAndInvalidValue() throws Exception {
         Http3HeadersFrame headersFrame = new DefaultHttp3HeadersFrame();
         headersFrame.headers().add(HttpHeaderNames.TE, "something");
         testHeadersFrame(headersFrame, Http3ErrorCode.H3_MESSAGE_ERROR);
     }
 
     @Test
-    public void testHttp3HeadersFrameWithTeHeaderAndValidValue() {
+    public void testHttp3HeadersFrameWithTeHeaderAndValidValue() throws Exception {
         Http3HeadersFrame headersFrame = new DefaultHttp3HeadersFrame();
         headersFrame.headers().add(HttpHeaderNames.TE, HttpHeaderValues.TRAILERS);
         testHeadersFrame(headersFrame, null);
     }
 
-    private static void testHeadersFrame(Http3HeadersFrame headersFrame, Http3ErrorCode code) {
-        EmbeddedQuicStreamChannel channel = new EmbeddedQuicStreamChannel(
-                Http3RequestStreamValidationHandler.newServerValidator());
+    @Test
+    public void testInformationalResponseAfterActualResponseServer() throws Exception {
+        testInformationalResponse(true, true, newResponse(OK), newResponse(CONTINUE));
+    }
+
+    @Test
+    public void testInformationalResponseAfterActualResponseClient() throws Exception {
+        testInformationalResponse(false, true, newResponse(OK), newResponse(CONTINUE));
+    }
+
+    @Test
+    public void testMultiInformationalResponseServer() throws Exception {
+        testInformationalResponse(true, false, newResponse(CONTINUE), newResponse(CONTINUE), newResponse(OK));
+    }
+
+    @Test
+    public void testMultiInformationalResponseClient() throws Exception {
+        testInformationalResponse(false, false, newResponse(CONTINUE), newResponse(CONTINUE), newResponse(OK));
+    }
+
+    @Test
+    public void testMultiInformationalResponseAfterActualResponseServer() throws Exception {
+        testInformationalResponse(true, false, newResponse(CONTINUE), newResponse(CONTINUE), newResponse(OK));
+    }
+
+    @Test
+    public void testMultiInformationalResponseAfterActualResponseClient() throws Exception {
+        testInformationalResponse(false, false, newResponse(CONTINUE), newResponse(CONTINUE), newResponse(OK));
+    }
+
+    @Test
+    public void testInformationalResponseWithDataAndTrailersServer() throws Exception {
+        testInformationalResponse(true, false, newResponse(CONTINUE), newResponse(OK),
+                new DefaultHttp3DataFrame(Unpooled.buffer()),
+                new DefaultHttp3HeadersFrame());
+    }
+
+    @Test
+    public void testInformationalResponseWithDataAndTrailersClient() throws Exception {
+        testInformationalResponse(false, false, newResponse(CONTINUE), newResponse(OK),
+                new DefaultHttp3DataFrame(Unpooled.buffer()),
+                new DefaultHttp3HeadersFrame());
+    }
+
+    @Test
+    public void testInformationalResponseWithDataServer() throws Exception {
+        testInformationalResponse(true, false, newResponse(CONTINUE), newResponse(OK),
+                new DefaultHttp3DataFrame(Unpooled.buffer()));
+    }
+
+    @Test
+    public void testInformationalResponseWithDataClient() throws Exception {
+        testInformationalResponse(false, false, newResponse(CONTINUE), newResponse(OK),
+                new DefaultHttp3DataFrame(Unpooled.buffer()));
+    }
+
+    @Test
+    public void testInformationalResponsePostDataServer() throws Exception {
+        testInformationalResponse(true, true, newResponse(OK),
+                new DefaultHttp3DataFrame(Unpooled.buffer()), newResponse(CONTINUE));
+    }
+
+    @Test
+    public void testInformationalResponsePostDataClient() throws Exception {
+        testInformationalResponse(false, true, newResponse(OK),
+                new DefaultHttp3DataFrame(Unpooled.buffer()), newResponse(CONTINUE));
+    }
+
+    @Test
+    public void testInformationalResponsePostTrailersServer() throws Exception {
+        testInformationalResponse(true, true, newResponse(OK),
+                new DefaultHttp3DataFrame(Unpooled.buffer()), new DefaultHttp3HeadersFrame(), newResponse(CONTINUE));
+    }
+
+    @Test
+    public void testInformationalResponsePostTrailersClient() throws Exception {
+        testInformationalResponse(false, true, newResponse(OK),
+                new DefaultHttp3DataFrame(Unpooled.buffer()), new DefaultHttp3HeadersFrame(), newResponse(CONTINUE));
+    }
+
+    private void testInformationalResponse(boolean server, boolean expectFail, Http3Frame... frames) throws Exception {
+        EmbeddedQuicStreamChannel channel = server ? newServerStream() :
+                newClientStream(() -> false);
+
+        for (int i = 0; i < frames.length; i++) {
+            Http3Frame frame = frames[i];
+            Http3Frame read = null;
+            try {
+                if (server) {
+                    assertTrue(channel.writeOutbound(frame));
+                    if (expectFail && i == frames.length - 1) {
+                        fail();
+                    } else {
+                        read = channel.readOutbound();
+                    }
+                } else {
+                    assertTrue(channel.writeInbound(frame));
+                    if (expectFail && i == frames.length - 1) {
+                        fail();
+                    } else {
+                        read = channel.readInbound();
+                    }
+                }
+                assertEquals(frame, read);
+            } catch (Exception e) {
+                assertException(H3_FRAME_UNEXPECTED, e);
+                if (!server) {
+                    verifyClose(H3_FRAME_UNEXPECTED, parent);
+                }
+            } finally {
+                release(read);
+            }
+        }
+        assertFalse(parent.finish());
+        assertFalse(channel.finish());
+    }
+
+    private void testHeadersFrame(Http3HeadersFrame headersFrame, Http3ErrorCode code) throws Exception {
+        EmbeddedQuicStreamChannel channel = newServerStream();
         try {
             assertTrue(channel.writeInbound(headersFrame));
             if (code != null) {
@@ -328,5 +464,29 @@ public class Http3RequestStreamValidationHandlerTest extends Http3FrameTypeValid
         }
         // Only expect produced messages when there was no error.
         assertEquals(code == null, channel.finishAndReleaseAll());
+    }
+
+    private EmbeddedQuicStreamChannel newClientStream(final BooleanSupplier goAwayReceivedSupplier) throws Exception {
+        return newStream(QuicStreamType.BIDIRECTIONAL, new ChannelInitializer<QuicStreamChannel>() {
+            @Override
+            protected void initChannel(QuicStreamChannel ch) {
+                Http3RequestStreamEncodeStateValidator encStateValidator = new Http3RequestStreamEncodeStateValidator();
+                Http3RequestStreamDecodeStateValidator decStateValidator = new Http3RequestStreamDecodeStateValidator();
+                ch.pipeline().addLast(encStateValidator);
+                ch.pipeline().addLast(decStateValidator);
+                ch.pipeline().addLast(newClientValidator(goAwayReceivedSupplier, qpackAttributes, decoder,
+                        encStateValidator, decStateValidator));
+            }
+        });
+    }
+
+    private EmbeddedQuicStreamChannel newServerStream() throws Exception {
+        return newStream(QuicStreamType.BIDIRECTIONAL, newHandler());
+    }
+
+    private static Http3Frame newResponse(HttpResponseStatus status) {
+        Http3HeadersFrame frame = new DefaultHttp3HeadersFrame();
+        frame.headers().status(status.codeAsText());
+        return frame;
     }
 }

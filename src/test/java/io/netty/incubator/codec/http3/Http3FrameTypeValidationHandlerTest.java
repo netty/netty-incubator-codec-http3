@@ -15,16 +15,23 @@
  */
 package io.netty.incubator.codec.http3;
 
+import io.netty.channel.ChannelHandler;
+import io.netty.incubator.codec.quic.QuicStreamType;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-public class Http3FrameTypeValidationHandlerTest extends
+abstract class Http3FrameTypeValidationHandlerTest extends
         AbstractHttp3FrameTypeValidationHandlerTest<Http3RequestStreamFrame> {
 
+    Http3FrameTypeValidationHandlerTest(boolean isOutbound, boolean isInbound) {
+        super(QuicStreamType.BIDIRECTIONAL, isOutbound, isInbound);
+    }
+
     @Override
-    protected Http3FrameTypeValidationHandler<Http3RequestStreamFrame> newHandler() {
-        return new Http3FrameTypeValidationHandler<>(Http3RequestStreamFrame.class);
+    protected ChannelHandler newHandler() {
+        return new Http3FrameTypeDuplexValidationHandler<>(Http3RequestStreamFrame.class);
     }
 
     @Override

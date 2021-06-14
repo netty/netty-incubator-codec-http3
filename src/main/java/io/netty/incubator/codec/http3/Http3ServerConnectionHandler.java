@@ -37,7 +37,7 @@ public final class Http3ServerConnectionHandler extends Http3ConnectionHandler {
      *                              This handler will receive {@link Http3HeadersFrame} and {@link Http3DataFrame}s.
      */
     public Http3ServerConnectionHandler(ChannelHandler requestStreamHandler) {
-        this(requestStreamHandler, null, null, null);
+        this(requestStreamHandler, null, null, null, false);
     }
 
     /**
@@ -53,21 +53,27 @@ public final class Http3ServerConnectionHandler extends Http3ConnectionHandler {
      *                                              {@code null} if no special handling should be done.
      * @param localSettings                         the local {@link Http3SettingsFrame} that should be sent to the
      *                                             remote peer or {@code null} if the default settings should be used.
+     * @param disableQpackDynamicTable              If QPACK dynamic table should be disabled.
      */
     public Http3ServerConnectionHandler(ChannelHandler requestStreamHandler,
                                         ChannelHandler inboundControlStreamHandler,
                                         LongFunction<ChannelHandler> unknownInboundStreamHandlerFactory,
-                                        Http3SettingsFrame localSettings) {
-        super(true, inboundControlStreamHandler, unknownInboundStreamHandlerFactory, localSettings);
+                                        Http3SettingsFrame localSettings, boolean disableQpackDynamicTable) {
+        super(true, inboundControlStreamHandler, unknownInboundStreamHandlerFactory, localSettings,
+                disableQpackDynamicTable);
         this.requestStreamHandler = ObjectUtil.checkNotNull(requestStreamHandler, "requestStreamHandler");
     }
 
     @Override
     void initBidirectionalStream(ChannelHandlerContext ctx, QuicStreamChannel streamChannel) {
         ChannelPipeline pipeline = streamChannel.pipeline();
+        Http3RequestStreamEncodeStateValidator encodeStateValidator = new Http3RequestStreamEncodeStateValidator();
+        Http3RequestStreamDecodeStateValidator decodeStateValidator = new Http3RequestStreamDecodeStateValidator();
         // Add the encoder and decoder in the pipeline so we can handle Http3Frames
-        pipeline.addLast(newCodec());
-        pipeline.addLast(newRequestStreamValidationHandler());
+        pipeline.addLast(newCodec(encodeStateValidator, decodeStateValidator));
+        pipeline.addLast(encodeStateValidator);
+        pipeline.addLast(decodeStateValidator);
+        pipeline.addLast(newRequestStreamValidationHandler(streamChannel, encodeStateValidator, decodeStateValidator));
         pipeline.addLast(requestStreamHandler);
     }
 }

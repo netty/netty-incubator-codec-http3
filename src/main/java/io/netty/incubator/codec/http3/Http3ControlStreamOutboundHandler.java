@@ -16,7 +16,6 @@
 package io.netty.incubator.codec.http3;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -24,8 +23,10 @@ import io.netty.channel.socket.ChannelInputShutdownEvent;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.ObjectUtil;
 
+import static io.netty.incubator.codec.http3.Http3CodecUtils.closeOnFailure;
+
 final class Http3ControlStreamOutboundHandler
-        extends Http3FrameTypeValidationHandler<Http3ControlStreamFrame> {
+        extends Http3FrameTypeDuplexValidationHandler<Http3ControlStreamFrame> {
     private final boolean server;
     private final Http3SettingsFrame localSettings;
     private final ChannelHandler codec;
@@ -69,8 +70,7 @@ final class Http3ControlStreamOutboundHandler
         // we did write the type via a ByteBuf.
         ctx.pipeline().addFirst(codec);
         // If writing of the local settings fails let's just teardown the connection.
-        ctx.writeAndFlush(DefaultHttp3SettingsFrame.copyOf(localSettings))
-                .addListener(ChannelFutureListener.CLOSE_ON_FAILURE);
+        closeOnFailure(ctx.writeAndFlush(DefaultHttp3SettingsFrame.copyOf(localSettings)));
 
         ctx.fireChannelActive();
     }
@@ -92,7 +92,7 @@ final class Http3ControlStreamOutboundHandler
     }
 
     @Override
-    public void write(ChannelHandlerContext ctx, Http3ControlStreamFrame msg, ChannelPromise promise) throws Exception {
+    void write(ChannelHandlerContext ctx, Http3ControlStreamFrame msg, ChannelPromise promise) {
         if (msg instanceof Http3MaxPushIdFrame) {
             sentMaxPushId = ((Http3MaxPushIdFrame) msg).id();
         }

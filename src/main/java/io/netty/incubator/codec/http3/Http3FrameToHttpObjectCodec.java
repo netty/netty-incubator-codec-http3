@@ -156,18 +156,19 @@ public final class Http3FrameToHttpObjectCodec extends Http3RequestStreamInbound
             boolean readable = last.content().isReadable();
             boolean hasTrailers = !last.trailingHeaders().isEmpty();
 
-            if (future != null && !readable && !hasTrailers) {
-                future.addListener(QuicStreamChannel.WRITE_FIN);
-            } else {
-                if (!hasTrailers) {
-                    future = ctx.write(new DefaultHttp3DataFrame(last.content()));
-                } else {
-                    Http3Headers headers = HttpConversionUtil.toHttp3Headers(last.trailingHeaders(), validateHeaders);
-                    future = ctx.write(new DefaultHttp3HeadersFrame(headers));
-                }
+            if (readable) {
+                future = ctx.write(new DefaultHttp3DataFrame(last.content()));
+            }
+            if (hasTrailers) {
+                Http3Headers headers = HttpConversionUtil.toHttp3Headers(last.trailingHeaders(), validateHeaders);
+                future = ctx.write(new DefaultHttp3HeadersFrame(headers));
+            }
+            if (future != null) {
                 future.addListener(QuicStreamChannel.WRITE_FIN);
             }
-            last.release();
+            if (!readable) {
+                last.release();
+            }
         } else if (msg instanceof HttpContent) {
             ctx.write(new DefaultHttp3DataFrame(((HttpContent) msg).content()));
         }

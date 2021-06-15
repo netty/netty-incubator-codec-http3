@@ -53,7 +53,7 @@ public class Http3PushStreamTest {
     @Before
     public void setUp() throws Exception {
         serverConnectionHandler = new Http3ServerConnectionHandler(new ChannelDuplexHandler(), null, null, null, true);
-        serverChannel = new EmbeddedQuicChannel(serverConnectionHandler);
+        serverChannel = new EmbeddedQuicChannel(true, serverConnectionHandler);
         serverLocalControlStream = (EmbeddedQuicStreamChannel) Http3.getLocalControlStream(serverChannel);
         assertNotNull(serverLocalControlStream);
         serverControlStreamHandlerCtx = mock(ChannelHandlerContext.class);
@@ -64,7 +64,7 @@ public class Http3PushStreamTest {
         pushStreamManager = new Http3ServerPushStreamManager(serverChannel);
 
         clientConnectionHandler = new Http3ClientConnectionHandler(null, null, null, null, true);
-        clientChannel = new EmbeddedQuicChannel(clientConnectionHandler);
+        clientChannel = new EmbeddedQuicChannel(false, clientConnectionHandler);
         clientLocalControlStream = (EmbeddedQuicStreamChannel) Http3.getLocalControlStream(clientChannel);
         assertNotNull(clientLocalControlStream);
 

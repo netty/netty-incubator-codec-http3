@@ -64,7 +64,7 @@ public class Http3UnidirectionalStreamInboundHandlerTest {
 
     @Before
     public void setUp() {
-        parent = new EmbeddedQuicChannel();
+        parent = new EmbeddedQuicChannel(server);
         qpackEncoder = new QpackEncoder();
         qpackDecoder = new QpackDecoder(new DefaultHttp3SettingsFrame());
         localControlStreamHandler = new Http3ControlStreamInboundHandler(server, null, qpackEncoder,
@@ -154,7 +154,7 @@ public class Http3UnidirectionalStreamInboundHandlerTest {
 
     private void testPushStream(long maxPushId) throws Exception {
         assertFalse(parent.finish());
-        parent = new EmbeddedQuicChannel(server ?
+        parent = new EmbeddedQuicChannel(server, server ?
                 new Http3ServerConnectionHandler(new ChannelInboundHandlerAdapter()) :
                 new Http3ClientConnectionHandler());
         final EmbeddedQuicStreamChannel localControlStream =

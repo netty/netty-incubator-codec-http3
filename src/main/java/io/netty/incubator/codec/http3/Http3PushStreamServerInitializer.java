@@ -18,9 +18,13 @@ package io.netty.incubator.codec.http3;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelPipeline;
 import io.netty.incubator.codec.quic.QuicStreamChannel;
+import io.netty.incubator.codec.quic.QuicStreamType;
 
+import static io.netty.incubator.codec.http3.Http3CodecUtils.isServerInitiatedQuicStream;
 import static io.netty.incubator.codec.http3.Http3CodecUtils.writeVariableLengthInteger;
 import static io.netty.incubator.codec.http3.Http3RequestStreamCodecState.NO_STATE;
+import static io.netty.incubator.codec.quic.QuicStreamType.BIDIRECTIONAL;
+import static io.netty.incubator.codec.quic.QuicStreamType.UNIDIRECTIONAL;
 import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
 
 /**
@@ -37,6 +41,12 @@ public abstract class Http3PushStreamServerInitializer extends Http3PushStreamIn
 
     @Override
     protected final void initChannel(QuicStreamChannel ch) {
+        if (!isServerInitiatedQuicStream(ch)) {
+            throw new IllegalArgumentException("Using server push stream initializer for client stream: " +
+                    ch.streamId());
+        }
+        verifyIsUnidirectional(ch);
+
         // We need to write stream type into the stream before doing anything else.
         // See https://tools.ietf.org/html/draft-ietf-quic-http-32#section-6.2.1
         // Just allocate 16 bytes which would be the max needed to write 2 variable length ints.

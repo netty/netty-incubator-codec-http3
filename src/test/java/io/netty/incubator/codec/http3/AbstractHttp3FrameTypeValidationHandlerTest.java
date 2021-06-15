@@ -41,6 +41,7 @@ import static org.junit.Assume.assumeTrue;
 
 public abstract class AbstractHttp3FrameTypeValidationHandlerTest<T extends Http3Frame> {
 
+    private final boolean server;
     private final QuicStreamType defaultStreamType;
     private final boolean isOutbound;
     private final boolean isInbound;
@@ -53,7 +54,8 @@ public abstract class AbstractHttp3FrameTypeValidationHandlerTest<T extends Http
 
     protected abstract List<Http3Frame> newInvalidFrames();
 
-    protected AbstractHttp3FrameTypeValidationHandlerTest(QuicStreamType defaultStreamType) {
+    protected AbstractHttp3FrameTypeValidationHandlerTest(boolean server, QuicStreamType defaultStreamType) {
+        this.server = server;
         this.defaultStreamType = defaultStreamType;
         this.isOutbound = this instanceof ChannelOutboundHandler;
         this.isInbound = this instanceof ChannelInboundHandler;
@@ -61,7 +63,7 @@ public abstract class AbstractHttp3FrameTypeValidationHandlerTest<T extends Http
 
     @Before
     public void setUp() {
-        parent = new EmbeddedQuicChannel();
+        parent = new EmbeddedQuicChannel(server);
         qpackAttributes = new QpackAttributes(parent, false);
         setQpackAttributes(parent, qpackAttributes);
     }

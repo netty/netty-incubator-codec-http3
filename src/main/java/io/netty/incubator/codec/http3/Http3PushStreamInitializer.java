@@ -19,7 +19,16 @@ package io.netty.incubator.codec.http3;
 import io.netty.channel.ChannelInitializer;
 import io.netty.incubator.codec.quic.QuicStreamChannel;
 
+import static io.netty.incubator.codec.quic.QuicStreamType.BIDIRECTIONAL;
+
 abstract class Http3PushStreamInitializer extends ChannelInitializer<QuicStreamChannel> {
+
+    static void verifyIsUnidirectional(QuicStreamChannel ch) {
+        if (ch.type() == BIDIRECTIONAL) {
+            throw new IllegalArgumentException("Using push stream initializer for bi-directional stream: " +
+                    ch.streamId());
+        }
+    }
 
     /**
      * Initialize the {@link QuicStreamChannel} to handle {@link Http3PushStreamFrame}s. At the point of calling this

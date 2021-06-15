@@ -145,8 +145,7 @@ final class Http3RequestStreamValidationUtils {
 
     // See https://tools.ietf.org/html/draft-ietf-quic-http-34#section-4.1.3
     private static long verifyContentLength(int length, long expectedLength, long seenLength, boolean end,
-                                            boolean clientHeadRequest)
-            throws Http3Exception {
+                                            boolean clientHeadRequest) throws Http3Exception {
         seenLength += length;
         if (expectedLength != -1 && (seenLength > expectedLength ||
                 (!clientHeadRequest && end && seenLength != expectedLength))) {

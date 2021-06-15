@@ -63,7 +63,7 @@ public class Http3ServerPushStreamManagerTest {
                 ReferenceCountUtil.release(frame);
             }
         }, null, null, null, true);
-        channel = new EmbeddedQuicChannel(connectionHandler);
+        channel = new EmbeddedQuicChannel(true, connectionHandler);
         localControlStream = (EmbeddedQuicStreamChannel) Http3.getLocalControlStream(channel);
         assertNotNull(localControlStream);
         assertTrue(localControlStream.releaseOutbound()); // settings

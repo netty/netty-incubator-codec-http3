@@ -52,7 +52,7 @@ public class Http3ControlStreamInboundHandlerTest extends
     private Http3ControlStreamOutboundHandler remoteControlStreamHandler;
 
     public Http3ControlStreamInboundHandlerTest(boolean server, boolean forwardControlFrames) {
-        super(QuicStreamType.UNIDIRECTIONAL);
+        super(true, QuicStreamType.UNIDIRECTIONAL);
         this.server = server;
         this.forwardControlFrames = forwardControlFrames;
     }

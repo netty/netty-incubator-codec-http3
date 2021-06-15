@@ -100,7 +100,6 @@ public final class Http3ServerPushStreamManager {
                         return null;
                     });
                 }
-                //super.channelRead(ctx, msg);
                 ReferenceCountUtil.release(msg);
             }
         };

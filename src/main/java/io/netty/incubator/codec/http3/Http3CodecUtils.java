@@ -65,6 +65,18 @@ final class Http3CodecUtils {
         return type >= MIN_RESERVED_FRAME_TYPE && type <= MAX_RESERVED_FRAME_TYPE;
     }
 
+    /**
+     * Checks if the passed {@link QuicStreamChannel} is a server initiated stream.
+     *
+     * @param channel to check.
+     * @return {@code true} if the passed {@link QuicStreamChannel} is a server initiated stream.
+     */
+    static boolean isServerInitiatedQuicStream(QuicStreamChannel channel) {
+        // Server streams have odd stream id
+        // https://www.rfc-editor.org/rfc/rfc9000.html#name-stream-types-and-identifier
+        return channel.streamId() % 2 != 0;
+    }
+
     static boolean isReservedHttp2FrameType(long type) {
         switch ((int) type) {
             // Reserved types that were used in HTTP/2
@@ -186,7 +198,7 @@ final class Http3CodecUtils {
      * See <a href="https://tools.ietf.org/html/draft-ietf-quic-transport-32#section-16">
      *     Variable-Length Integer Encoding </a>
      */
-     static int numBytesForVariableLengthInteger(byte b) {
+    static int numBytesForVariableLengthInteger(byte b) {
         byte val = (byte) (b >> 6);
         if ((val & 1) != 0) {
             if ((val & 2) != 0) {

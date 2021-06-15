@@ -37,14 +37,19 @@ import io.netty.incubator.codec.quic.QuicStreamChannelConfig;
 import io.netty.incubator.codec.quic.QuicStreamFrame;
 import io.netty.incubator.codec.quic.QuicStreamPriority;
 import io.netty.incubator.codec.quic.QuicStreamType;
+import io.netty.util.AttributeKey;
 
 import java.net.SocketAddress;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
+
+import static io.netty.incubator.codec.http3.EmbeddedQuicChannel.prependStreamIdGeneratorHandler;
+import static io.netty.util.AttributeKey.valueOf;
 
 final class EmbeddedQuicStreamChannel extends EmbeddedChannel implements QuicStreamChannel {
+    private static final AttributeKey<Long> streamIdKey = valueOf("embedded_channel_stream_id");
     private final boolean localCreated;
     private final QuicStreamType type;
-    private final long id;
     private QuicStreamChannelConfig config;
     private Integer inputShutdown;
     private Integer outputShutdown;
@@ -53,16 +58,12 @@ final class EmbeddedQuicStreamChannel extends EmbeddedChannel implements QuicStr
         this(null, false, QuicStreamType.BIDIRECTIONAL, 0, handlers);
     }
 
-    EmbeddedQuicStreamChannel(boolean localCreated, QuicStreamType type, long id, ChannelHandler... handlers) {
-        this(null, localCreated, type, id, handlers);
-    }
-
     EmbeddedQuicStreamChannel(QuicChannel parent, boolean localCreated, QuicStreamType type,
                               long id, ChannelHandler... handlers) {
-        super(parent, DefaultChannelId.newInstance(), true, false, handlers);
+        super(parent, DefaultChannelId.newInstance(), true, false,
+                prependStreamIdGeneratorHandler(channel -> channel.attr(streamIdKey).set(id), handlers));
         this.localCreated = localCreated;
         this.type = type;
-        this.id = id;
     }
 
     boolean writeInboundWithFin(Object... msgs) {
@@ -139,7 +140,7 @@ final class EmbeddedQuicStreamChannel extends EmbeddedChannel implements QuicStr
 
     @Override
     public long streamId() {
-        return id;
+        return attr(streamIdKey).get();
     }
 
     @Override

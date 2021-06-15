@@ -18,6 +18,7 @@ package io.netty.incubator.codec.http3;
 import io.netty.channel.ChannelPipeline;
 import io.netty.incubator.codec.quic.QuicStreamChannel;
 
+import static io.netty.incubator.codec.http3.Http3CodecUtils.isServerInitiatedQuicStream;
 import static io.netty.incubator.codec.http3.Http3RequestStreamCodecState.NO_STATE;
 
 /**
@@ -28,6 +29,12 @@ public abstract class Http3PushStreamClientInitializer extends Http3PushStreamIn
 
     @Override
     protected final void initChannel(QuicStreamChannel ch) {
+        if (isServerInitiatedQuicStream(ch)) {
+            throw new IllegalArgumentException("Using client push stream initializer for server stream: " +
+                    ch.streamId());
+        }
+        verifyIsUnidirectional(ch);
+
         Http3ConnectionHandler connectionHandler = Http3CodecUtils.getConnectionHandlerOrClose(ch.parent());
         if (connectionHandler == null) {
             // connection should have been closed

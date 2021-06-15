@@ -37,8 +37,10 @@ public final class Http3ClientConnectionHandler extends Http3ConnectionHandler {
     /**
      * Create a new instance.
      *
-     * @param pushStreamHandlerFactory the {@link ChannelHandler} which will be notified about
-     * {@link Http3RequestStreamFrame}s or {@code null} if the user is not interested in these.
+     * @param pushStreamHandlerFactory              the {@link LongFunction} that will provide a custom
+     *                                              {@link ChannelHandler} for push streams {@code null} if no special
+     *                                              handling should be done. When present, push ID will be passed as an
+     *                                              argument to the {@link LongFunction}.
      */
     public Http3ClientConnectionHandler(LongFunction<ChannelHandler> pushStreamHandlerFactory) {
         this(null, pushStreamHandlerFactory, null, null, false);

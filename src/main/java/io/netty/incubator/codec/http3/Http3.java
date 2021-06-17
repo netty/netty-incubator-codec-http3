@@ -59,11 +59,12 @@ public final class Http3 {
 
     /**
      * Returns the value of the <a
-     * href="https://quicwg.org/base-drafts/draft-ietf-quic-http.html#name-max_push_id"> max push ID</a> received for
+     * href="https://quicwg.org/base-drafts/draft-ietf-quic-http.html#name-max_push_id">max push ID</a> received for
      * this connection.
      *
-     * @return Received <a href="https://quicwg.org/base-drafts/draft-ietf-quic-http.html#name-max_push_id">
-     *     max push ID</a> for this connection.
+     * @return Received <a
+     * href="https://quicwg.org/base-drafts/draft-ietf-quic-http.html#name-max_push_id">max push ID</a> for this
+     * connection.
      */
     static long maxPushIdReceived(QuicChannel channel) {
         final Http3ConnectionHandler connectionHandler = Http3CodecUtils.getConnectionHandlerOrClose(channel);

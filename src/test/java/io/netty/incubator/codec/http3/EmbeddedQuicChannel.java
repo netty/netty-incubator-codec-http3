@@ -64,12 +64,12 @@ final class EmbeddedQuicChannel extends EmbeddedChannel implements QuicChannel {
     }
 
     EmbeddedQuicChannel(boolean server, ChannelHandler... handlers) {
-        super(prependStreamIdGeneratorHandler(
-                channel -> channel.attr(streamIdGeneratorKey).set(new AtomicLong(server ? 1 : 0)), handlers));
+        super(prependChannelConsumer(channel -> channel.attr(streamIdGeneratorKey).set(new AtomicLong(server ? 1 : 0)),
+                handlers));
     }
 
-    static ChannelHandler[] prependStreamIdGeneratorHandler(Consumer<Channel> channelConsumer,
-                                                            ChannelHandler... handlers) {
+    static ChannelHandler[] prependChannelConsumer(Consumer<Channel> channelConsumer,
+                                                   ChannelHandler... handlers) {
         ChannelHandler[] toReturn = new ChannelHandler[handlers.length + 1];
         toReturn[0] = new ChannelInboundHandlerAdapter() {
             @Override

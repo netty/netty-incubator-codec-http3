@@ -50,20 +50,20 @@ final class Http3PushStreamClientValidationHandler
 
         if (frame instanceof Http3HeadersFrame) {
             Http3HeadersFrame headersFrame = (Http3HeadersFrame) frame;
-            long mayBeContentLength = validateHeaderFrameRead(headersFrame, ctx, decodeState);
-            if (mayBeContentLength >= 0) {
-                expectedLength = mayBeContentLength;
-            } else if (mayBeContentLength == INVALID_FRAME_READ) {
+            long maybeContentLength = validateHeaderFrameRead(headersFrame, ctx, decodeState);
+            if (maybeContentLength >= 0) {
+                expectedLength = maybeContentLength;
+            } else if (maybeContentLength == INVALID_FRAME_READ) {
                 return;
             }
         }
 
         if (frame instanceof Http3DataFrame) {
             final Http3DataFrame dataFrame = (Http3DataFrame) frame;
-            long mayBeContentLength = validateDataFrameRead(dataFrame, ctx, expectedLength, seenLength, false);
-            if (mayBeContentLength >= 0) {
-                seenLength = mayBeContentLength;
-            } else if (mayBeContentLength == INVALID_FRAME_READ) {
+            long maybeContentLength = validateDataFrameRead(dataFrame, ctx, expectedLength, seenLength, false);
+            if (maybeContentLength >= 0) {
+                seenLength = maybeContentLength;
+            } else if (maybeContentLength == INVALID_FRAME_READ) {
                 return;
             }
         }

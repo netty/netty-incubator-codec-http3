@@ -41,15 +41,14 @@ import io.netty.util.AttributeKey;
 
 import java.net.SocketAddress;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 
-import static io.netty.incubator.codec.http3.EmbeddedQuicChannel.prependStreamIdGeneratorHandler;
+import static io.netty.incubator.codec.http3.EmbeddedQuicChannel.prependChannelConsumer;
 import static io.netty.util.AttributeKey.valueOf;
 
 final class EmbeddedQuicStreamChannel extends EmbeddedChannel implements QuicStreamChannel {
     private static final AttributeKey<Long> streamIdKey = valueOf("embedded_channel_stream_id");
-    private final boolean localCreated;
-    private final QuicStreamType type;
+    private static final AttributeKey<QuicStreamType> streamTypeKey = valueOf("embedded_channel_stream_type");
+    private static final AttributeKey<Boolean> localCreatedKey = valueOf("embedded_channel_stream_local_created");
     private QuicStreamChannelConfig config;
     private Integer inputShutdown;
     private Integer outputShutdown;
@@ -61,9 +60,11 @@ final class EmbeddedQuicStreamChannel extends EmbeddedChannel implements QuicStr
     EmbeddedQuicStreamChannel(QuicChannel parent, boolean localCreated, QuicStreamType type,
                               long id, ChannelHandler... handlers) {
         super(parent, DefaultChannelId.newInstance(), true, false,
-                prependStreamIdGeneratorHandler(channel -> channel.attr(streamIdKey).set(id), handlers));
-        this.localCreated = localCreated;
-        this.type = type;
+                prependChannelConsumer(channel -> {
+                    channel.attr(streamIdKey).set(id);
+                    channel.attr(streamTypeKey).set(type);
+                    channel.attr(localCreatedKey).set(localCreated);
+                }, handlers));
     }
 
     boolean writeInboundWithFin(Object... msgs) {
@@ -130,12 +131,12 @@ final class EmbeddedQuicStreamChannel extends EmbeddedChannel implements QuicStr
 
     @Override
     public boolean isLocalCreated() {
-        return localCreated;
+        return attr(localCreatedKey).get();
     }
 
     @Override
     public QuicStreamType type() {
-        return type;
+        return attr(streamTypeKey).get();
     }
 
     @Override

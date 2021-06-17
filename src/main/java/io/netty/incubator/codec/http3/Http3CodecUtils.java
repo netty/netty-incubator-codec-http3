@@ -22,12 +22,14 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.incubator.codec.quic.QuicChannel;
 import io.netty.incubator.codec.quic.QuicStreamChannel;
+import io.netty.incubator.codec.quic.QuicStreamType;
 import io.netty.util.CharsetUtil;
 import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.StringUtil;
 
 import static io.netty.channel.ChannelFutureListener.CLOSE_ON_FAILURE;
 import static io.netty.incubator.codec.http3.Http3ErrorCode.H3_INTERNAL_ERROR;
+import static io.netty.incubator.codec.quic.QuicStreamType.UNIDIRECTIONAL;
 
 final class Http3CodecUtils {
     static final long DEFAULT_MAX_HEADER_LIST_SIZE = 0xffffffffL;
@@ -313,5 +315,18 @@ final class Http3CodecUtils {
             return null;
         }
         return connectionHandler;
+    }
+
+    /**
+     * Verify if the passed {@link QuicStreamChannel} is a {@link QuicStreamType#UNIDIRECTIONAL} QUIC stream.
+     *
+     * @param ch to verify
+     * @throws IllegalArgumentException if the passed {@link QuicStreamChannel} is not a
+     * {@link QuicStreamType#UNIDIRECTIONAL} QUIC stream.
+     */
+    static void verifyIsUnidirectional(QuicStreamChannel ch) {
+        if (ch.type() != UNIDIRECTIONAL) {
+            throw new IllegalArgumentException("Invalid stream type: " + ch.type() + " for stream: " + ch.streamId());
+        }
     }
 }

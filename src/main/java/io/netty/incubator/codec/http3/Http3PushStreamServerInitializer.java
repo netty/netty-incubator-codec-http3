@@ -16,22 +16,20 @@
 package io.netty.incubator.codec.http3;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.incubator.codec.quic.QuicStreamChannel;
-import io.netty.incubator.codec.quic.QuicStreamType;
 
 import static io.netty.incubator.codec.http3.Http3CodecUtils.isServerInitiatedQuicStream;
 import static io.netty.incubator.codec.http3.Http3CodecUtils.writeVariableLengthInteger;
 import static io.netty.incubator.codec.http3.Http3RequestStreamCodecState.NO_STATE;
-import static io.netty.incubator.codec.quic.QuicStreamType.BIDIRECTIONAL;
-import static io.netty.incubator.codec.quic.QuicStreamType.UNIDIRECTIONAL;
 import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
 
 /**
  * Abstract base class that users can extend to init HTTP/3 push-streams for servers. This initializer
  * will automatically add HTTP/3 codecs etc to the {@link ChannelPipeline} as well.
  */
-public abstract class Http3PushStreamServerInitializer extends Http3PushStreamInitializer {
+public abstract class Http3PushStreamServerInitializer extends ChannelInitializer<QuicStreamChannel> {
 
     private final long pushId;
 
@@ -45,7 +43,7 @@ public abstract class Http3PushStreamServerInitializer extends Http3PushStreamIn
             throw new IllegalArgumentException("Using server push stream initializer for client stream: " +
                     ch.streamId());
         }
-        verifyIsUnidirectional(ch);
+        Http3CodecUtils.verifyIsUnidirectional(ch);
 
         // We need to write stream type into the stream before doing anything else.
         // See https://tools.ietf.org/html/draft-ietf-quic-http-32#section-6.2.1
@@ -70,4 +68,12 @@ public abstract class Http3PushStreamServerInitializer extends Http3PushStreamIn
         pipeline.addLast(connectionHandler.newPushStreamValidationHandler(ch, NO_STATE));
         initPushStream(ch);
     }
+
+    /**
+     * Initialize the {@link QuicStreamChannel} to handle {@link Http3PushStreamFrame}s. At the point of calling this
+     * method it is already valid to write {@link Http3PushStreamFrame}s as the codec is already in the pipeline.
+     *
+     * @param ch the {QuicStreamChannel} for the push stream.
+     */
+    protected abstract void initPushStream(QuicStreamChannel ch);
 }

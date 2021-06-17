@@ -15,6 +15,7 @@
  */
 package io.netty.incubator.codec.http3;
 
+import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.incubator.codec.quic.QuicStreamChannel;
 
@@ -25,7 +26,7 @@ import static io.netty.incubator.codec.http3.Http3RequestStreamCodecState.NO_STA
  * Abstract base class that users can extend to init HTTP/3 push-streams for clients. This initializer
  * will automatically add HTTP/3 codecs etc to the {@link ChannelPipeline} as well.
  */
-public abstract class Http3PushStreamClientInitializer extends Http3PushStreamInitializer {
+public abstract class Http3PushStreamClientInitializer extends ChannelInitializer<QuicStreamChannel> {
 
     @Override
     protected final void initChannel(QuicStreamChannel ch) {
@@ -33,7 +34,7 @@ public abstract class Http3PushStreamClientInitializer extends Http3PushStreamIn
             throw new IllegalArgumentException("Using client push stream initializer for server stream: " +
                     ch.streamId());
         }
-        verifyIsUnidirectional(ch);
+        Http3CodecUtils.verifyIsUnidirectional(ch);
 
         Http3ConnectionHandler connectionHandler = Http3CodecUtils.getConnectionHandlerOrClose(ch.parent());
         if (connectionHandler == null) {
@@ -49,4 +50,12 @@ public abstract class Http3PushStreamClientInitializer extends Http3PushStreamIn
         pipeline.addLast(connectionHandler.newPushStreamValidationHandler(ch, decodeStateValidator));
         initPushStream(ch);
     }
+
+    /**
+     * Initialize the {@link QuicStreamChannel} to handle {@link Http3PushStreamFrame}s. At the point of calling this
+     * method it is already valid to write {@link Http3PushStreamFrame}s as the codec is already in the pipeline.
+     *
+     * @param ch the {QuicStreamChannel} for the push stream.
+     */
+    protected abstract void initPushStream(QuicStreamChannel ch);
 }

@@ -190,7 +190,7 @@ final class Http3ControlStreamInboundHandler extends Http3FrameTypeInboundValida
     private boolean handleHttp3CancelPushFrame(ChannelHandlerContext ctx, Http3CancelPushFrame cancelPushFrame) {
         final Long maxPushId = server ? receivedMaxPushId : remoteControlStreamHandler.sentMaxPushId();
         if (maxPushId == null || maxPushId < cancelPushFrame.id()) {
-            connectionError(ctx, H3_ID_ERROR, "CANCEL_PUSH received with an id greater than MAX_PUSH_ID.",
+            connectionError(ctx, H3_ID_ERROR, "CANCEL_PUSH received with an ID greater than MAX_PUSH_ID.",
                     forwardControlFrames());
             return false;
         }

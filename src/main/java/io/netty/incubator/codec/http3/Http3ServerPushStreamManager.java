@@ -74,7 +74,7 @@ public final class Http3ServerPushStreamManager {
      * @param initialPushStreamsCountHint a hint for the number of push streams that may be created.
      */
     public Http3ServerPushStreamManager(QuicChannel channel, int initialPushStreamsCountHint) {
-        this.channel = requireNonNull(channel);
+        this.channel = requireNonNull(channel, "channel");
         pushStreams = newConcurrentHashMap(initialPushStreamsCountHint);
         controlStreamListener = new ChannelInboundHandlerAdapter() {
             @Override
@@ -111,7 +111,7 @@ public final class Http3ServerPushStreamManager {
      * @return {@code true} if server push is allowed at this point.
      */
     public boolean isPushAllowed() {
-        return isPushAllowed0(maxPushIdReceived(channel));
+        return isPushAllowed(maxPushIdReceived(channel));
     }
 
     /**
@@ -124,7 +124,7 @@ public final class Http3ServerPushStreamManager {
      */
     public long reserveNextPushId() {
         final long maxPushId = maxPushIdReceived(channel);
-        if (isPushAllowed0(maxPushId)) {
+        if (isPushAllowed(maxPushId)) {
             return nextPushId();
         }
         throw new IllegalStateException("MAX allowed push ID: " + maxPushId + ", next push ID: " + nextId);
@@ -192,7 +192,7 @@ public final class Http3ServerPushStreamManager {
         return controlStreamListener;
     }
 
-    private boolean isPushAllowed0(long maxPushId) {
+    private boolean isPushAllowed(long maxPushId) {
         return nextId <= maxPushId;
     }
 

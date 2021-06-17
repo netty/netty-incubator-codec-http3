@@ -98,21 +98,21 @@ final class Http3RequestStreamValidationHandler extends Http3FrameTypeDuplexVali
 
         if (frame instanceof Http3HeadersFrame) {
             Http3HeadersFrame headersFrame = (Http3HeadersFrame) frame;
-            long mayBeContentLength = validateHeaderFrameRead(headersFrame, ctx, decodeState);
-            if (mayBeContentLength >= 0) {
-                expectedLength = mayBeContentLength;
-            } else if (mayBeContentLength == INVALID_FRAME_READ) {
+            long maybeContentLength = validateHeaderFrameRead(headersFrame, ctx, decodeState);
+            if (maybeContentLength >= 0) {
+                expectedLength = maybeContentLength;
+            } else if (maybeContentLength == INVALID_FRAME_READ) {
                 return;
             }
         }
 
         if (frame instanceof Http3DataFrame) {
             final Http3DataFrame dataFrame = (Http3DataFrame) frame;
-            long mayBeContentLength = validateDataFrameRead(dataFrame, ctx, expectedLength, seenLength,
+            long maybeContentLength = validateDataFrameRead(dataFrame, ctx, expectedLength, seenLength,
                     clientHeadRequest);
-            if (mayBeContentLength >= 0) {
-                seenLength = mayBeContentLength;
-            } else if (mayBeContentLength == INVALID_FRAME_READ) {
+            if (maybeContentLength >= 0) {
+                seenLength = maybeContentLength;
+            } else if (maybeContentLength == INVALID_FRAME_READ) {
                 return;
             }
         }

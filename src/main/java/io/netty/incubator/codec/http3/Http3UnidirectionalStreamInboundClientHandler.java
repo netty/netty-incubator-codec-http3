@@ -45,10 +45,10 @@ final class Http3UnidirectionalStreamInboundClientHandler extends Http3Unidirect
         Long maxPushId = remoteControlStreamHandler.sentMaxPushId();
         if (maxPushId == null) {
             Http3CodecUtils.connectionError(ctx, Http3ErrorCode.H3_ID_ERROR,
-                    "Received push stream before send MAX_PUSH_ID frame.", false);
+                    "Received push stream before sending MAX_PUSH_ID frame.", false);
         } else if (maxPushId < pushId) {
             Http3CodecUtils.connectionError(ctx, Http3ErrorCode.H3_ID_ERROR,
-                    "Received push stream with id " + pushId + " while the max push id is " + maxPushId + '.', false);
+                    "Received push stream with ID " + pushId + " while the max push id is " + maxPushId + '.', false);
         } else {
             // Replace this handler with the actual push stream handlers.
             final ChannelHandler pushStreamHandler = pushStreamHandlerFactory.apply(pushId);

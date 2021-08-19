@@ -745,33 +745,34 @@ final class Http3FrameCodec extends ByteToMessageDecoder implements ChannelOutbo
 
         void enqueue(Object msg, ChannelPromise promise) {
             assert ctx.channel().eventLoop().inEventLoop();
-
             buffer.addLast(new BufferedEntry(msg, promise));
         }
 
         void enqueueFlush() {
             assert ctx.channel().eventLoop().inEventLoop();
-
             buffer.addLast(FLUSH);
         }
 
         void drain() {
             assert ctx.channel().eventLoop().inEventLoop();
             boolean flushSeen = false;
-            for (Object entry = buffer.pollFirst(); entry != null; entry = buffer.pollFirst()) {
-                if (entry == FLUSH) {
-                    flushSeen = true;
-                } else {
-                    assert entry instanceof BufferedEntry;
-                    BufferedEntry bufferedEntry = (BufferedEntry) entry;
-                    codec.write0(ctx, bufferedEntry.msg, bufferedEntry.promise);
+            try {
+                for (Object entry = buffer.pollFirst(); entry != null; entry = buffer.pollFirst()) {
+                    if (entry == FLUSH) {
+                        flushSeen = true;
+                    } else {
+                        assert entry instanceof BufferedEntry;
+                        BufferedEntry bufferedEntry = (BufferedEntry) entry;
+                        codec.write0(ctx, bufferedEntry.msg, bufferedEntry.promise);
+                    }
                 }
-            }
-            // indicate that writes do not need to be enqueued. As we are on the eventloop, no other writes can happen
-            // while we are draining, hence we would not write out of order.
-            codec.writeResumptionListener = null;
-            if (flushSeen) {
-                codec.flush(ctx);
+                // indicate that writes do not need to be enqueued. As we are on the eventloop, no other writes can
+                // happen while we are draining, hence we would not write out of order.
+                codec.writeResumptionListener = null;
+            } finally {
+                if (flushSeen) {
+                    codec.flush(ctx);
+                }
             }
         }
 

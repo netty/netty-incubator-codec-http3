@@ -420,7 +420,7 @@ final class Http3FrameCodec extends ByteToMessageDecoder implements ChannelOutbo
 
         if ((msg instanceof Http3HeadersFrame || msg instanceof Http3PushPromiseFrame) &&
                 !qpackAttributes.dynamicTableDisabled() && !qpackAttributes.encoderStreamAvailable()) {
-            writeResumptionListener = new WriteResumptionListener(ctx, this);
+            writeResumptionListener = WriteResumptionListener.newListener(ctx, this);
             writeResumptionListener.enqueue(msg, promise);
             return;
         }
@@ -730,12 +730,10 @@ final class Http3FrameCodec extends ByteToMessageDecoder implements ChannelOutbo
         private final ChannelHandlerContext ctx;
         private final Http3FrameCodec codec;
 
-        WriteResumptionListener(ChannelHandlerContext ctx, Http3FrameCodec codec) {
+        private WriteResumptionListener(ChannelHandlerContext ctx, Http3FrameCodec codec) {
             this.ctx = ctx;
             this.codec = codec;
             buffer = new ArrayDeque<>(4); // assuming we will buffer header, data, trailer and a flush
-            assert codec.qpackAttributes != null;
-            codec.qpackAttributes.whenEncoderStreamAvailable(this);
         }
 
         @Override
@@ -774,6 +772,13 @@ final class Http3FrameCodec extends ByteToMessageDecoder implements ChannelOutbo
                     codec.flush(ctx);
                 }
             }
+        }
+
+        static WriteResumptionListener newListener(ChannelHandlerContext ctx, Http3FrameCodec codec) {
+            WriteResumptionListener listener = new WriteResumptionListener(ctx, codec);
+            assert codec.qpackAttributes != null;
+            codec.qpackAttributes.whenEncoderStreamAvailable(listener);
+            return listener;
         }
 
         private static final class BufferedEntry {

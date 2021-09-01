@@ -174,7 +174,7 @@ public class Http3UnidirectionalStreamInboundHandlerTest {
             ReferenceCountUtil.release(written);
         }
 
-        if (maxPushId >= 0) {
+        if (!server && maxPushId >= 0) {
             assertTrue(outboundControlChannel.writeOutbound(new DefaultHttp3MaxPushIdFrame(maxPushId)));
             Object push = outboundControlChannel.readOutbound();
             ReferenceCountUtil.release(push);

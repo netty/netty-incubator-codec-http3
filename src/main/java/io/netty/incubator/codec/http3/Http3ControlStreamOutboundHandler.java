@@ -93,17 +93,10 @@ final class Http3ControlStreamOutboundHandler
 
     @Override
     void write(ChannelHandlerContext ctx, Http3ControlStreamFrame msg, ChannelPromise promise) {
-        final boolean valid;
-        if (msg instanceof Http3MaxPushIdFrame) {
-            valid = handleHttp3MaxPushIdFrame(promise, (Http3MaxPushIdFrame) msg);
-        } else if (msg instanceof Http3GoAwayFrame) {
-            valid = handleHttp3GoAwayFrame(promise, (Http3GoAwayFrame) msg);
-        } else {
-            assert msg instanceof Http3UnknownFrame;
-            valid = true;
-        }
-
-        if (!valid) {
+        if (msg instanceof Http3MaxPushIdFrame && !handleHttp3MaxPushIdFrame(promise, (Http3MaxPushIdFrame) msg)) {
+            ReferenceCountUtil.release(msg);
+            return;
+        } else if (msg instanceof Http3GoAwayFrame && !handleHttp3GoAwayFrame(promise, (Http3GoAwayFrame) msg)) {
             ReferenceCountUtil.release(msg);
             return;
         }

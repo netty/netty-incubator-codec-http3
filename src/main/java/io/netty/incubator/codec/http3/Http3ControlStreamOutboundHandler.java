@@ -127,6 +127,11 @@ final class Http3ControlStreamOutboundHandler
             return false;
         }
 
+        if (!server && sentMaxPushId != null && id > sentMaxPushId) {
+            promise.setFailure(new Http3Exception(Http3ErrorCode.H3_ID_ERROR, "GOAWAY id is bigger then the last MAX_PUSH_ID: " + id + " > " + sentMaxPushId));
+            return false;
+        }
+
         if (sendGoAwayId != null && id > sendGoAwayId) {
             promise.setFailure(new Http3Exception(Http3ErrorCode.H3_ID_ERROR,
                     "GOAWAY id is bigger then the last sent: " + id + " > " + sendGoAwayId));

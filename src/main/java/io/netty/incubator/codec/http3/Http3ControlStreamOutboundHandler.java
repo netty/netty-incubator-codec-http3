@@ -120,11 +120,6 @@ final class Http3ControlStreamOutboundHandler
             return false;
         }
 
-        if (server) {
-            promise.setFailure(new Http3Exception(Http3ErrorCode.H3_FRAME_UNEXPECTED, "MAX_PUSH_ID sent by server"));
-            return false;
-        }
-
         sentMaxPushId = maxPushIdFrame.id();
         return true;
     }

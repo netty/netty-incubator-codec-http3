@@ -141,12 +141,8 @@ public class Http3ControlStreamOutboundHandlerTest extends
         // Let's mark the parent as inactive before we close as otherwise we will send a close frame.
         EmbeddedChannel channel = newStream(newHandler());
 
-        if (server) {
-            writeInvalidFrame(Http3ErrorCode.H3_FRAME_UNEXPECTED, channel, new DefaultHttp3MaxPushIdFrame(4));
-        } else {
-            writeValidFrame(channel, new DefaultHttp3MaxPushIdFrame(8));
-            writeInvalidFrame(Http3ErrorCode.H3_ID_ERROR, channel, new DefaultHttp3MaxPushIdFrame(4));
-        }
+        writeValidFrame(channel, new DefaultHttp3MaxPushIdFrame(8));
+        writeInvalidFrame(Http3ErrorCode.H3_ID_ERROR, channel, new DefaultHttp3MaxPushIdFrame(4));
 
         assertFalse(channel.finish());
     }
@@ -158,13 +154,9 @@ public class Http3ControlStreamOutboundHandlerTest extends
         Http3ControlStreamOutboundHandler handler = newHandler();
         EmbeddedChannel channel = newStream(handler);
 
-        if (server) {
-            writeInvalidFrame(Http3ErrorCode.H3_FRAME_UNEXPECTED, channel, new DefaultHttp3MaxPushIdFrame(4));
-        } else {
-            writeValidFrame(channel, new DefaultHttp3MaxPushIdFrame(4));
-            writeValidFrame(channel, new DefaultHttp3MaxPushIdFrame(8));
-            assertEquals(Long.valueOf(8), handler.sentMaxPushId());
-        }
+        writeValidFrame(channel, new DefaultHttp3MaxPushIdFrame(4));
+        writeValidFrame(channel, new DefaultHttp3MaxPushIdFrame(8));
+        assertEquals(Long.valueOf(8), handler.sentMaxPushId());
 
         assertFalse(channel.finish());
     }

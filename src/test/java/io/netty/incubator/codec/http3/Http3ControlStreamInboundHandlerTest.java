@@ -164,6 +164,25 @@ public class Http3ControlStreamInboundHandlerTest extends
     }
 
     @Test
+    public void testClientGoAwayIdIsLimitedByMaxPushId() throws Exception {
+        assumeThat(server, is(true));
+        EmbeddedChannel channel = newStream();
+
+        writeValidFrame(channel, new DefaultHttp3MaxPushIdFrame(4));
+        writeInvalidFrame(Http3ErrorCode.H3_ID_ERROR, channel, new DefaultHttp3GoAwayFrame(5));
+        assertFalse(channel.finish());
+    }
+
+    @Test
+    public void testClientGoAwayIdIsNotLimitedWhenMaxPushIdIsNotSet() throws Exception {
+        assumeThat(server, is(true));
+        EmbeddedChannel channel = newStream();
+
+        writeValidFrame(channel, new DefaultHttp3GoAwayFrame(5));
+        assertFalse(channel.finish());
+    }
+
+    @Test
     public void testHttp3MaxPushIdFrames() throws Exception {
         EmbeddedChannel channel = newStream();
         if (server) {

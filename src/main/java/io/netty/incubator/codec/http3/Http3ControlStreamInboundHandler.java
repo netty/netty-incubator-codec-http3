@@ -163,10 +163,6 @@ final class Http3ControlStreamInboundHandler extends Http3FrameTypeInboundValida
                     forwardControlFrames());
             return false;
         }
-        if (server && receivedMaxPushId != null && id > receivedMaxPushId) {
-            connectionError(ctx, H3_ID_ERROR, "GOAWAY received ID larger than MAX_PUSH_ID", forwardControlFrames());
-            return false;
-        }
         if (receivedGoawayId != null && id > receivedGoawayId) {
             connectionError(ctx, H3_ID_ERROR,
                     "GOAWAY received with ID larger than previously received.", forwardControlFrames());

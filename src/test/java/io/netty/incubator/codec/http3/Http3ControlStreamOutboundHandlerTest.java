@@ -31,11 +31,13 @@ import java.util.Collection;
 import java.util.List;
 
 import static io.netty.incubator.codec.http3.Http3TestUtils.*;
+import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeThat;
 
 @RunWith(Parameterized.class)
 public class Http3ControlStreamOutboundHandlerTest extends
@@ -112,6 +114,7 @@ public class Http3ControlStreamOutboundHandlerTest extends
 
     @Test
     public void testGoAwayIdUseInvalidId() throws Exception {
+        assumeThat(server, is(true));
         parent.close().get();
         // Let's mark the parent as inactive before we close as otherwise we will send a close frame.
         EmbeddedChannel channel = newStream(newHandler());

@@ -88,7 +88,7 @@ public abstract class Http3ConnectionHandler extends ChannelInboundHandlerAdapte
                     .addListener(f -> {
                         if (!f.isSuccess()) {
                             ctx.fireExceptionCaught(new Http3Exception(Http3ErrorCode.H3_STREAM_CREATION_ERROR,
-                                    "Unable to open control stream, cause: " + f.cause()));
+                                    "Unable to open control stream", f.cause()));
                             ctx.close();
                         } else {
                             Http3.setLocalControlStream(channel, (QuicStreamChannel) f.getNow());

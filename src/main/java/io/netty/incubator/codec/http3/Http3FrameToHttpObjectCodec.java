@@ -194,7 +194,12 @@ public final class Http3FrameToHttpObjectCodec extends Http3RequestStreamInbound
      * Write a message. If there is a combiner, add a new write promise to that combiner. If there is no combiner
      * ({@code null}), use the {@code outerPromise} directly as the write promise.
      */
-    private static void writeWithOptionalCombiner(ChannelHandlerContext ctx, Object msg, ChannelPromise outerPromise, PromiseCombiner combiner) {
+    private static void writeWithOptionalCombiner(
+            ChannelHandlerContext ctx,
+            Object msg,
+            ChannelPromise outerPromise,
+            PromiseCombiner combiner
+    ) {
         if (combiner == null) {
             ctx.write(msg, outerPromise);
         } else {

@@ -559,7 +559,8 @@ public class Http3FrameToHttpObjectCodecTest {
     @Test
     public void testEncodeFullPromiseCompletes() {
         EmbeddedQuicStreamChannel ch = new EmbeddedQuicStreamChannel(new Http3FrameToHttpObjectCodec(false));
-        ChannelFuture writeFuture = ch.writeOneOutbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/hello/world"));
+        ChannelFuture writeFuture = ch.writeOneOutbound(new DefaultFullHttpRequest(
+                HttpVersion.HTTP_1_1, HttpMethod.GET, "/hello/world"));
         ch.flushOutbound();
         assertTrue(writeFuture.isSuccess());
 
@@ -577,7 +578,8 @@ public class Http3FrameToHttpObjectCodecTest {
     @Test
     public void testEncodeEmptyLastPromiseCompletes() {
         EmbeddedQuicStreamChannel ch = new EmbeddedQuicStreamChannel(new Http3FrameToHttpObjectCodec(false));
-        ChannelFuture f1 = ch.writeOneOutbound(new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/hello/world"));
+        ChannelFuture f1 = ch.writeOneOutbound(new DefaultHttpRequest(
+                HttpVersion.HTTP_1_1, HttpMethod.GET, "/hello/world"));
         ChannelFuture f2 = ch.writeOneOutbound(new DefaultLastHttpContent());
         ch.flushOutbound();
         assertTrue(f1.isSuccess());
@@ -597,8 +599,10 @@ public class Http3FrameToHttpObjectCodecTest {
     @Test
     public void testEncodeMultiplePromiseCompletes() {
         EmbeddedQuicStreamChannel ch = new EmbeddedQuicStreamChannel(new Http3FrameToHttpObjectCodec(false));
-        ChannelFuture f1 = ch.writeOneOutbound(new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/hello/world"));
-        ChannelFuture f2 = ch.writeOneOutbound(new DefaultLastHttpContent(Unpooled.wrappedBuffer("foo".getBytes(StandardCharsets.UTF_8))));
+        ChannelFuture f1 = ch.writeOneOutbound(new DefaultHttpRequest(
+                HttpVersion.HTTP_1_1, HttpMethod.GET, "/hello/world"));
+        ChannelFuture f2 = ch.writeOneOutbound(new DefaultLastHttpContent(
+                Unpooled.wrappedBuffer("foo".getBytes(StandardCharsets.UTF_8))));
         ch.flushOutbound();
         assertTrue(f1.isSuccess());
         assertTrue(f2.isSuccess());
@@ -620,8 +624,10 @@ public class Http3FrameToHttpObjectCodecTest {
     @Test
     public void testEncodeTrailersCompletes() {
         EmbeddedQuicStreamChannel ch = new EmbeddedQuicStreamChannel(new Http3FrameToHttpObjectCodec(false));
-        ChannelFuture f1 = ch.writeOneOutbound(new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/hello/world"));
-        LastHttpContent last = new DefaultLastHttpContent(Unpooled.wrappedBuffer("foo".getBytes(StandardCharsets.UTF_8)));
+        ChannelFuture f1 = ch.writeOneOutbound(new DefaultHttpRequest(
+                HttpVersion.HTTP_1_1, HttpMethod.GET, "/hello/world"));
+        LastHttpContent last = new DefaultLastHttpContent(
+                Unpooled.wrappedBuffer("foo".getBytes(StandardCharsets.UTF_8)));
         last.trailingHeaders().add("foo", "bar");
         ChannelFuture f2 = ch.writeOneOutbound(last);
         ch.flushOutbound();

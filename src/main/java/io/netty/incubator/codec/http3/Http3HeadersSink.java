@@ -85,9 +85,9 @@ final class Http3HeadersSink implements BiConsumer<CharSequence, CharSequence> {
                     // For requests we must include:
                     // - :method
                     // - :scheme
-                    // - :authority
+                    // - :authority (optional, MUST be omitted when translating HTTP/1.1 to HTTP/3)
                     // - :path
-                    if (pseudoHeadersCount != 4) {
+                    if (pseudoHeadersCount != 4 && (pseudoHeadersCount != 3 || headers.authority() != null)) {
                         // There can't be any duplicates for pseudy header names.
                         throw new Http3HeadersValidationException("Not all mandatory pseudo-headers included.");
                     }

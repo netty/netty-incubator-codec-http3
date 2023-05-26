@@ -767,6 +767,8 @@ data.release();
             Http3DataFrame dataFrame = ch.readOutbound();
             assertThat(dataFrame.content().readableBytes(), is(1));
             dataFrame.release();
+        } else if (!headers && !hasTrailers && !last) {
+            ch.<Http3DataFrame>readOutbound().release();
         }
         if (hasTrailers) {
             Http3HeadersFrame trailersFrame = ch.readOutbound();

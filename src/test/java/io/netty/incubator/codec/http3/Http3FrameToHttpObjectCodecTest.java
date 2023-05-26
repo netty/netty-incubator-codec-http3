@@ -794,6 +794,7 @@ data.release();
         if (!voidPromise) {
             assertTrue(fullPromise.isDone());
         }
+            assertFalse(ch.finish());
     }
 
     @Test

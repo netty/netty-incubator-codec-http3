@@ -670,7 +670,7 @@ public class Http3FrameToHttpObjectCodecTest {
         Http3HeadersFrame headersFrame = ch.readOutbound();
         Http3Headers headers = headersFrame.headers();
         Http3DataFrame data = ch.readOutbound();
-
+data.release();
         assertThat(headers.scheme().toString(), is("https"));
         assertThat(headers.method().toString(), is("POST"));
         assertThat(headers.path().toString(), is("/hello/world"));
@@ -723,6 +723,7 @@ public class Http3FrameToHttpObjectCodecTest {
             } else {
                 if (hasTrailers || nonEmptyContent) {
                     // not supported by the netty HTTP/1 model
+                    content.release();
                     return;
                 }
                 msg = new DefaultHttpRequest(
@@ -734,6 +735,7 @@ public class Http3FrameToHttpObjectCodecTest {
             } else {
                 if (hasTrailers) {
                     // makes no sense
+                    content.release();
                     return;
                 }
                 msg = new DefaultHttpContent(content);
@@ -764,6 +766,7 @@ public class Http3FrameToHttpObjectCodecTest {
         if (nonEmptyContent) {
             Http3DataFrame dataFrame = ch.readOutbound();
             assertThat(dataFrame.content().readableBytes(), is(1));
+            data.release();
         }
         if (hasTrailers) {
             Http3HeadersFrame trailersFrame = ch.readOutbound();

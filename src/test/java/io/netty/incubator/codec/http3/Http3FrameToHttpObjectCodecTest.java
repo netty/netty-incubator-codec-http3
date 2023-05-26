@@ -766,7 +766,7 @@ data.release();
         if (nonEmptyContent) {
             Http3DataFrame dataFrame = ch.readOutbound();
             assertThat(dataFrame.content().readableBytes(), is(1));
-            data.release();
+            dataFrame.release();
         }
         if (hasTrailers) {
             Http3HeadersFrame trailersFrame = ch.readOutbound();
@@ -794,7 +794,7 @@ data.release();
         if (!voidPromise) {
             assertTrue(fullPromise.isDone());
         }
-            assertFalse(ch.finish());
+        assertFalse(ch.finish());
     }
 
     @Test

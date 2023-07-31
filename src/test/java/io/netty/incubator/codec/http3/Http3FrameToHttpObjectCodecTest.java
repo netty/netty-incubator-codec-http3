@@ -1018,7 +1018,9 @@ data.release();
                                         DefaultHttp3HeadersFrame responseHeaders = new DefaultHttp3HeadersFrame();
                                         responseHeaders.headers().status(HttpResponseStatus.OK.codeAsText());
                                         ctx.write(responseHeaders, ctx.voidPromise());
-                                        ctx.write(new DefaultHttp3DataFrame(ByteBufUtil.encodeString(ctx.alloc(), CharBuffer.wrap("foo"), CharsetUtil.UTF_8)), ctx.voidPromise());
+                                        ctx.write(new DefaultHttp3DataFrame(ByteBufUtil.encodeString(
+                                                ctx.alloc(), CharBuffer.wrap("foo"), CharsetUtil.UTF_8)),
+                                                ctx.voidPromise());
                                         // send a fin, this also flushes
                                         ((DuplexChannel) ctx.channel()).shutdownOutput();
                                     } else {
@@ -1051,7 +1053,6 @@ data.release();
                     .remoteAddress(server.localAddress())
                     .localAddress(client.localAddress())
                     .connect().get();
-
 
             BlockingQueue<Object> received = new LinkedBlockingQueue<>();
             QuicStreamChannel stream = Http3.newRequestStream(quicChannel, new Http3RequestStreamInitializer() {

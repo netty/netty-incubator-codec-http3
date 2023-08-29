@@ -21,6 +21,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.socket.ChannelInputShutdownEvent;
 import io.netty.incubator.codec.quic.QuicException;
 import io.netty.incubator.codec.quic.QuicStreamChannel;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
@@ -63,8 +64,10 @@ public abstract class Http3RequestStreamInboundHandler extends ChannelInboundHan
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        // in case the handler is removed between channelRead and channelReadComplete. Should be rare
-        handleBufferedMessage(ctx, ((QuicStreamChannel) ctx.channel()).isInputShutdown());
+        if (bufferedMessage != null) {
+            ReferenceCountUtil.release(bufferedMessage);
+            bufferedMessage = null;
+        }
     }
 
     private void handleBufferedMessage(ChannelHandlerContext ctx, boolean noMoreInput) throws Exception {

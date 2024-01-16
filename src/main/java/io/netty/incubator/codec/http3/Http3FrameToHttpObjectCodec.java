@@ -50,7 +50,7 @@ import java.net.SocketAddress;
  * and back. It can be used as an adapter in conjunction with {@link
  * Http3ServerConnectionHandler} or {@link Http3ClientConnectionHandler} to make http/3 connections
  * backward-compatible with {@link ChannelHandler}s expecting {@link HttpObject}.
- *
+ * <p>
  * For simplicity, it converts to chunked encoding unless the entire stream
  * is a single header.
  */
@@ -148,7 +148,7 @@ public final class Http3FrameToHttpObjectCodec extends Http3RequestStreamInbound
                     return;
                 } else {
                     throw new EncoderException(
-                            HttpResponseStatus.CONTINUE.toString() + " must be a FullHttpResponse");
+                            HttpResponseStatus.CONTINUE + " must be a FullHttpResponse");
                 }
             }
         }
@@ -187,18 +187,20 @@ public final class Http3FrameToHttpObjectCodec extends Http3RequestStreamInbound
                 Http3Headers headers = HttpConversionUtil.toHttp3Headers(last.trailingHeaders(), validateHeaders);
                 promise = writeWithOptionalCombiner(ctx,
                         new DefaultHttp3HeadersFrame(headers), promise, combiner, true);
-            }
-            if (!readable) {
+            } else if (!readable) {
+                // Release the data and just use EMPTY_BUFFER. This might allow us to give back memory to the allocator
+                // faster.
                 last.release();
+                if (combiner == null) {
+                    // We only need to write something if there was no write before.
+                    promise = writeWithOptionalCombiner(ctx,
+                            new DefaultHttp3DataFrame(Unpooled.EMPTY_BUFFER), promise, combiner, true);
+                }
             }
-
-            if (!readable && !hasTrailers && combiner == null) {
-                // we had to write nothing. happy days!
-                ((QuicStreamChannel) ctx.channel()).shutdownOutput();
-                promise.trySuccess();
-            } else {
-                promise.addListener(QuicStreamChannel.SHUTDOWN_OUTPUT);
-            }
+            // The shutdown is always done via the listener to ensure previous written data is correctly drained
+            // before QuicStreamChannel.shutdownOutput() is called. Missing to do so might cause previous queued data
+            // to be failed with a ClosedChannelException.
+            promise.addListener(QuicStreamChannel.SHUTDOWN_OUTPUT);
         } else if (msg instanceof HttpContent) {
             promise = writeWithOptionalCombiner(ctx,
                     new DefaultHttp3DataFrame(((HttpContent) msg).content()), promise, combiner, false);

@@ -97,7 +97,6 @@ final class Http3HeadersSink implements BiConsumer<CharSequence, CharSequence> {
                             !(pseudoHeadersCount == 3 && headers.authority() == null &&
                                     "*".contentEquals(headers.path()))) {
                         throw new Http3HeadersValidationException("Not all mandatory pseudo-headers included.");
-
                     }
                 } else {
                     // For requests we must include:

@@ -91,7 +91,7 @@ public class Http3HeadersSinkTest {
         Http3HeadersSink sink = new Http3HeadersSink(new DefaultHttp3Headers(), 512, true, false);
         sink.accept(Http3Headers.PseudoHeaderName.METHOD.value(), "GET");
         sink.accept(Http3Headers.PseudoHeaderName.PATH.value(), "/");
-        sink.accept(Http3Headers.PseudoHeaderName.AUTHORITY.value(), "value");
+        sink.accept(Http3Headers.PseudoHeaderName.SCHEME.value(), "https");
         assertThrows(Http3HeadersValidationException.class, () -> sink.finish());
     }
 
@@ -134,12 +134,21 @@ public class Http3HeadersSinkTest {
     }
 
     @Test
-    public void testAuthorityNotRequired() throws Http3Exception {
+    public void testAuthorityNotRequiredForOptionsWildcard() throws Http3Exception {
         Http3HeadersSink sink = new Http3HeadersSink(new DefaultHttp3Headers(), 512, true, false);
-        sink.accept(Http3Headers.PseudoHeaderName.METHOD.value(), "GET");
-        sink.accept(Http3Headers.PseudoHeaderName.PATH.value(), "/");
+        sink.accept(Http3Headers.PseudoHeaderName.METHOD.value(), "OPTIONS");
+        sink.accept(Http3Headers.PseudoHeaderName.PATH.value(), "*");
         sink.accept(Http3Headers.PseudoHeaderName.SCHEME.value(), "https");
         sink.finish();
+    }
+
+    @Test
+    public void testAuthorityRequiredForOptionsNonWildcard() throws Http3Exception {
+        Http3HeadersSink sink = new Http3HeadersSink(new DefaultHttp3Headers(), 512, true, false);
+        sink.accept(Http3Headers.PseudoHeaderName.METHOD.value(), "OPTIONS");
+        sink.accept(Http3Headers.PseudoHeaderName.PATH.value(), "/something");
+        sink.accept(Http3Headers.PseudoHeaderName.SCHEME.value(), "https");
+        assertThrows(Http3HeadersValidationException.class, () -> sink.finish());
     }
 
     private static void addMandatoryPseudoHeaders(Http3HeadersSink sink, boolean req) {

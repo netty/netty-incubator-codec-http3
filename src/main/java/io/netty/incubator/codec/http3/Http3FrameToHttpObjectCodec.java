@@ -41,6 +41,7 @@ import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.incubator.codec.quic.QuicStreamChannel;
+import io.netty.util.concurrent.PromiseCombiner;
 
 import java.net.SocketAddress;
 
@@ -49,7 +50,7 @@ import java.net.SocketAddress;
  * and back. It can be used as an adapter in conjunction with {@link
  * Http3ServerConnectionHandler} or {@link Http3ClientConnectionHandler} to make http/3 connections
  * backward-compatible with {@link ChannelHandler}s expecting {@link HttpObject}.
- *
+ * <p>
  * For simplicity, it converts to chunked encoding unless the entire stream
  * is a single header.
  */
@@ -58,6 +59,7 @@ public final class Http3FrameToHttpObjectCodec extends Http3RequestStreamInbound
 
     private final boolean isServer;
     private final boolean validateHeaders;
+    private boolean inboundTranslationInProgress;
 
     public Http3FrameToHttpObjectCodec(final boolean isServer,
                                        final boolean validateHeaders) {
@@ -70,7 +72,12 @@ public final class Http3FrameToHttpObjectCodec extends Http3RequestStreamInbound
     }
 
     @Override
-    protected void channelRead(ChannelHandlerContext ctx, Http3HeadersFrame frame, boolean isLast) throws Exception {
+    public boolean isSharable() {
+        return false;
+    }
+
+    @Override
+    protected void channelRead(ChannelHandlerContext ctx, Http3HeadersFrame frame) throws Exception {
         Http3Headers headers = frame.headers();
         long id = ((QuicStreamChannel) ctx.channel()).streamId();
 
@@ -84,31 +91,33 @@ public final class Http3FrameToHttpObjectCodec extends Http3RequestStreamInbound
             return;
         }
 
-        if (isLast) {
-            if (headers.method() == null && status == null) {
-                LastHttpContent last = new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER, validateHeaders);
-                HttpConversionUtil.addHttp3ToHttpHeaders(id, headers, last.trailingHeaders(),
-                        HttpVersion.HTTP_1_1, true, true);
-                ctx.fireChannelRead(last);
-            } else {
-                FullHttpMessage full = newFullMessage(id, headers, ctx.alloc());
-                ctx.fireChannelRead(full);
-            }
+        if (headers.method() == null && status == null) {
+            // Must be trailers!
+            LastHttpContent last = new DefaultLastHttpContent(Unpooled.EMPTY_BUFFER, validateHeaders);
+            HttpConversionUtil.addHttp3ToHttpHeaders(id, headers, last.trailingHeaders(),
+                    HttpVersion.HTTP_1_1, true, true);
+            inboundTranslationInProgress = false;
+            ctx.fireChannelRead(last);
         } else {
             HttpMessage req = newMessage(id, headers);
             if (!HttpUtil.isContentLengthSet(req)) {
                 req.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
             }
+            inboundTranslationInProgress = true;
             ctx.fireChannelRead(req);
         }
     }
 
     @Override
-    protected void channelRead(ChannelHandlerContext ctx, Http3DataFrame frame, boolean isLast) throws Exception {
-        if (isLast) {
-            ctx.fireChannelRead(new DefaultLastHttpContent(frame.content()));
-        } else {
-            ctx.fireChannelRead(new DefaultHttpContent(frame.content()));
+    protected void channelRead(ChannelHandlerContext ctx, Http3DataFrame frame) throws Exception {
+        inboundTranslationInProgress = true;
+        ctx.fireChannelRead(new DefaultHttpContent(frame.content()));
+    }
+
+    @Override
+    protected void channelInputClosed(ChannelHandlerContext ctx) throws Exception {
+        if (inboundTranslationInProgress) {
+            ctx.fireChannelRead(LastHttpContent.EMPTY_LAST_CONTENT);
         }
     }
 
@@ -134,40 +143,96 @@ public final class Http3FrameToHttpObjectCodec extends Http3RequestStreamInbound
             if (res.status().equals(HttpResponseStatus.CONTINUE)) {
                 if (res instanceof FullHttpResponse) {
                     final Http3Headers headers = toHttp3Headers(res);
-                    ctx.write(new DefaultHttp3HeadersFrame(headers));
+                    ctx.write(new DefaultHttp3HeadersFrame(headers), promise);
                     ((FullHttpResponse) res).release();
                     return;
                 } else {
                     throw new EncoderException(
-                            HttpResponseStatus.CONTINUE.toString() + " must be a FullHttpResponse");
+                            HttpResponseStatus.CONTINUE + " must be a FullHttpResponse");
                 }
             }
         }
 
+        // this combiner is created lazily if we need multiple write calls
+        PromiseCombiner combiner = null;
+        // With the last content, *if* we write anything here, we need to wait for that write to complete before
+        // closing. To do that, we need to unvoid the promise. So if we write anything *and* this is the last message
+        // we will unvoid.
+        boolean isLast = msg instanceof LastHttpContent;
+
         if (msg instanceof HttpMessage) {
             Http3Headers headers = toHttp3Headers((HttpMessage) msg);
-            ctx.write(new DefaultHttp3HeadersFrame(headers));
+            DefaultHttp3HeadersFrame frame = new DefaultHttp3HeadersFrame(headers);
+
+            if (msg instanceof HttpContent && (!promise.isVoid() || isLast)) {
+                combiner = new PromiseCombiner(ctx.executor());
+            }
+            promise = writeWithOptionalCombiner(ctx, frame, promise, combiner, isLast);
         }
 
-        if (msg instanceof LastHttpContent) {
+        if (isLast) {
             LastHttpContent last = (LastHttpContent) msg;
-            boolean readable = last.content().isReadable();
-            boolean hasTrailers = !last.trailingHeaders().isEmpty();
+            try {
+                boolean readable = last.content().isReadable();
+                boolean hasTrailers = !last.trailingHeaders().isEmpty();
 
-            if (readable) {
-                ctx.write(new DefaultHttp3DataFrame(last.content()));
-            }
-            if (hasTrailers) {
-                Http3Headers headers = HttpConversionUtil.toHttp3Headers(last.trailingHeaders(), validateHeaders);
-                ctx.write(new DefaultHttp3HeadersFrame(headers));
-            }
-            if (!readable) {
+                if (combiner == null && readable && hasTrailers && !promise.isVoid()) {
+                    combiner = new PromiseCombiner(ctx.executor());
+                }
+
+                if (readable) {
+                    promise = writeWithOptionalCombiner(
+                            ctx, new DefaultHttp3DataFrame(last.content().retain()), promise, combiner, true);
+                }
+                if (hasTrailers) {
+                    Http3Headers headers = HttpConversionUtil.toHttp3Headers(last.trailingHeaders(), validateHeaders);
+                    promise = writeWithOptionalCombiner(ctx,
+                            new DefaultHttp3HeadersFrame(headers), promise, combiner, true);
+                } else if (!readable) {
+                    if (combiner == null) {
+                        // We only need to write something if there was no write before.
+                        promise = writeWithOptionalCombiner(
+                                ctx, new DefaultHttp3DataFrame(last.content().retain()), promise, combiner, true);
+                    }
+                }
+                // The shutdown is always done via the listener to ensure previous written data is correctly drained
+                // before QuicStreamChannel.shutdownOutput() is called. Missing to do so might cause previous queued
+                // data to be failed with a ClosedChannelException.
+                promise = promise.unvoid().addListener(QuicStreamChannel.SHUTDOWN_OUTPUT);
+            } finally {
+                // Release LastHttpContent, we retain the content if we need it.
                 last.release();
             }
-            ((QuicStreamChannel) ctx.channel()).shutdownOutput();
         } else if (msg instanceof HttpContent) {
-            ctx.write(new DefaultHttp3DataFrame(((HttpContent) msg).content()));
+            promise = writeWithOptionalCombiner(ctx,
+                    new DefaultHttp3DataFrame(((HttpContent) msg).content()), promise, combiner, false);
         }
+
+        if (combiner != null) {
+            combiner.finish(promise);
+        }
+    }
+
+    /**
+     * Write a message. If there is a combiner, add a new write promise to that combiner. If there is no combiner
+     * ({@code null}), use the {@code outerPromise} directly as the write promise.
+     */
+    private static ChannelPromise writeWithOptionalCombiner(
+            ChannelHandlerContext ctx,
+            Object msg,
+            ChannelPromise outerPromise,
+            PromiseCombiner combiner,
+            boolean unvoidPromise
+    ) {
+        if (unvoidPromise) {
+            outerPromise = outerPromise.unvoid();
+        }
+        if (combiner == null) {
+            ctx.write(msg, outerPromise);
+        } else {
+            combiner.add(ctx.write(msg));
+        }
+        return outerPromise;
     }
 
     private Http3Headers toHttp3Headers(HttpMessage msg) {

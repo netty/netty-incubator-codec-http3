@@ -23,7 +23,6 @@ import static io.netty.incubator.codec.http3.QpackUtil.MIN_HEADER_TABLE_SIZE;
 import static io.netty.incubator.codec.http3.QpackUtil.equalsVariableTime;
 import static io.netty.util.AsciiString.EMPTY_STRING;
 import static io.netty.util.internal.MathUtil.findNextPositivePowerOfTwo;
-import static java.lang.Math.floorDiv;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
@@ -62,18 +61,20 @@ final class QpackEncoderDynamicTable {
     private final byte hashMask;
 
     /**
-     * Current size of the table (https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#section-3.2.1)
+     * <a href="https://www.rfc-editor.org/rfc/rfc9204.html#name-dynamic-table-size">Current size of the table</a>.
      */
     private long size;
 
     /**
-     * Maximum capacity of the table (https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#section-3.2.3)
+     * <a href="https://www.rfc-editor.org/rfc/rfc9204.html#name-maximum-dynamic-table-capac">
+     *     Maximum capacity of the table</a>. This is set once based on the
+     *     {@link Http3SettingsFrame#HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY} received by the remote peer.
      */
-    private long capacity = -1;
+    private long maxTableCapacity = -1;
 
     /*
      * The below indexes follow the suggested heuristics in Section 2.1.1.1 Avoiding Prohibited insertions
-     * https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#section-2.1.1.1
+     * https://www.rfc-editor.org/rfc/rfc9204.html#name-avoiding-prohibited-inserti
      *
      *                Tail                             Drain       Head
      *                 |                                |           |
@@ -119,13 +120,23 @@ final class QpackEncoderDynamicTable {
         // than the length of this array, and we want the mask to be > 0.
         fields = new HeaderEntry[findNextPositivePowerOfTwo(max(2, min(arraySizeHint, 128)))];
         hashMask = (byte) (fields.length - 1);
-        head = new HeaderEntry(-1, EMPTY_STRING, EMPTY_STRING, 0, null);
+        // Start with index -1 so the first added header will have the index of 0.
+        // See https://www.rfc-editor.org/rfc/rfc9204.html#name-absolute-indexing
+        head = new HeaderEntry(-1, EMPTY_STRING, EMPTY_STRING, -1, null);
         this.expectedFreeCapacityPercentage = expectedFreeCapacityPercentage;
         resetIndicesToHead();
     }
 
+    /**
+     * Add a name - value pair to the dynamic table and returns the index.
+     *
+     * @param name          the name.
+     * @param value         the value.
+     * @param headerSize    the size of the header.
+     * @return              the absolute index or {@code -1) if it could not be added.
+     */
     int add(CharSequence name, CharSequence value, long headerSize) {
-        if (capacity - size < headerSize) {
+        if (maxTableCapacity - size < headerSize) {
             return -1;
         }
 
@@ -148,23 +159,39 @@ final class QpackEncoderDynamicTable {
     }
 
     /**
-     * Callback when a header block which had a {@link #requiredInsertCount()} greater than {@code 0} is
-     * <a href="https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-section-acknowledgment">acknowledged</a>
+     * Callback when a header block which had a {@link #insertCount()}} greater than {@code 0} is
+     * <a href="https://www.rfc-editor.org/rfc/rfc9204.html#name-section-acknowledgment">acknowledged</a>
      * by the decoder.
      *
-     * @param entryIndex For the entry corresponding to the {@link #requiredInsertCount()}.
+     * @param entryIndex For the entry corresponding to the {@link #insertCount()}.
      * @throws QpackException If the count is invalid.
      */
-    void acknowledgeInsertCount(int entryIndex) throws QpackException {
-        if (entryIndex <= 0) {
+    void acknowledgeInsertCountOnAck(int entryIndex) throws QpackException {
+        acknowledgeInsertCount(entryIndex, true);
+    }
+
+    /**
+     * Callback when a header block which had a {@link #insertCount()}} greater than {@code 0} is still not processed
+     * and the stream is <a href="https://www.rfc-editor.org/rfc/rfc9204.html#name-stream-cancellation">cancelled</a>
+     * by the decoder.
+     *
+     * @param entryIndex For the entry corresponding to the {@link #insertCount()}.
+     * @throws QpackException If the count is invalid.
+     */
+    void acknowledgeInsertCountOnCancellation(int entryIndex) throws QpackException {
+        acknowledgeInsertCount(entryIndex, false);
+    }
+
+    private void acknowledgeInsertCount(int entryIndex, boolean updateKnownReceived) throws QpackException {
+        if (entryIndex < 0) {
             throw INVALID_REQUIRED_INSERT_COUNT_INCREMENT;
         }
         for (HeaderEntry e = head.next; e != null; e = e.next) {
             if (e.index == entryIndex) {
                 assert e.refCount > 0;
                 e.refCount--;
-                if (e.index > knownReceived.index) {
-                    // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-known-received-count
+                if (updateKnownReceived && e.index > knownReceived.index) {
+                    // https://www.rfc-editor.org/rfc/rfc9204.html#name-known-received-count
                     // If the Required Insert Count of the acknowledged field section is greater than the current Known
                     // Received Count, Known Received Count is updated to that Required Insert Count value.
                     knownReceived = e;
@@ -175,13 +202,13 @@ final class QpackEncoderDynamicTable {
         }
         // We have reached the end of the linked list so the index was invalid and hence the connection should
         // be closed.
-        // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#section-4.4
+        // https://www.rfc-editor.org/rfc/rfc9204.html#section-4.4
         throw INVALID_REQUIRED_INSERT_COUNT_INCREMENT;
     }
 
     /**
      * Callback when a decoder <a
-     * href="https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-insert-count-increment">increments its
+     * href="https://www.rfc-editor.org/rfc/rfc9204.html#name-insert-count-increment">increments its
      * insert count.</a>
      *
      * @param knownReceivedCountIncr Increment count.
@@ -201,45 +228,57 @@ final class QpackEncoderDynamicTable {
         }
         // We have reached the end of the linked list so the index was invalid and hence the connection should be
         // closed.
-        // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#section-4.4
+        // https://www.rfc-editor.org/rfc/rfc9204.html#name-decoder-instructions
         throw INVALID_KNOW_RECEIVED_COUNT_INCREMENT;
     }
 
-    int requiredInsertCount() {
-        return requiredInsertCount(insertCount());
-    }
-
+    /**
+     * Returns the number of entries inserted to this dynamic table.
+     *
+     * @return number the added entries.
+     */
     int insertCount() {
-        return tail.index;
+        return tail.index + 1;
     }
 
-    int requiredInsertCount(int entryIndex) {
-        // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-required-insert-count
+    /**
+     * <a href="https://www.rfc-editor.org/rfc/rfc9204.html#name-required-insert-count">
+     *     Encodes the required insert count.</a>
+     * @param reqInsertCount    the required insert count.
+     * @return                  the encoded count.
+     */
+    int encodedRequiredInsertCount(int reqInsertCount) {
+        // https://www.rfc-editor.org/rfc/rfc9204.html#name-required-insert-count
         // if ReqInsertCount == 0:
         //      EncInsertCount = 0
         // else:
         //      EncInsertCount = (ReqInsertCount mod (2 * MaxEntries)) + 1
         //
-        return entryIndex == 0 ? 0 : entryIndex % toIntExact(2 * floorDiv(capacity, 32)) + 1;
+        return reqInsertCount == 0 ? 0 : reqInsertCount % toIntExact(2 * QpackUtil.maxEntries(maxTableCapacity)) + 1;
     }
 
     // Visible for tests
-    int knownReceivedCount() {
-        // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-known-received-count
-        return requiredInsertCount(knownReceived.index);
+    int encodedKnownReceivedCount() {
+        // https://www.rfc-editor.org/rfc/rfc9204.html#name-known-received-count
+        return encodedRequiredInsertCount(knownReceived.index + 1);
     }
 
+    /**
+     * Set the maximum capacity of the dynamic table. This can only be set once.
+     * @param capacity          the capacity
+     * @throws QpackException   if capacity was set before.
+     */
     void maxTableCapacity(long capacity) throws QpackException {
         validateCapacity(capacity);
-        if (this.capacity >= 0) {
+        if (this.maxTableCapacity >= 0) {
             throw CAPACITY_ALREADY_SET;
         }
-        this.capacity = capacity;
+        this.maxTableCapacity = capacity;
     }
 
     /**
      * Transforms the passed {@code entryIndex} as a <a
-     * href="https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-relative-indexing">relative index for
+     * href="https://www.rfc-editor.org/rfc/rfc9204.html#name-relative-indexing">relative index for
      * encoder instructions</a>.
      *
      * @param entryIndex to transform.
@@ -292,7 +331,7 @@ final class QpackEncoderDynamicTable {
      * @param name of the entry for lookups, not verified for the entry at the pased {@code idx}
      * @param value of the entry for lookups, not verified for the entry at the pased {@code idx}
      * @param idx of the entry.
-     * @return <a href="https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-required-insert-count">Required
+     * @return <a href="https://www.rfc-editor.org/rfc/rfc9204.html#name-required-insert-count">Required
      * insert count</a> if the passed entry has to be referenced in a header block.
      */
     int addReferenceToEntry(CharSequence name, CharSequence value, int idx) {
@@ -302,7 +341,7 @@ final class QpackEncoderDynamicTable {
             for (HeaderEntry e = fields[i]; e != null; e = e.nextSibling) {
                 if (e.hash == h && idx == e.index) {
                     e.refCount++;
-                    return requiredInsertCount(e.index);
+                    return e.index + 1;
                 }
             }
         }
@@ -312,7 +351,7 @@ final class QpackEncoderDynamicTable {
     boolean requiresDuplication(int idx, long size) {
         assert head != tail;
 
-        if (this.size + size > capacity || head == drain) {
+        if (this.size + size > maxTableCapacity || head == drain) {
             return false;
         }
         return idx >= head.next.index && idx <= drain.index;
@@ -374,7 +413,7 @@ final class QpackEncoderDynamicTable {
     }
 
     private void ensureFreeCapacity() {
-        long maxDesiredSize = max(ENTRY_OVERHEAD, ((100 - expectedFreeCapacityPercentage) * capacity) / 100);
+        long maxDesiredSize = max(ENTRY_OVERHEAD, ((100 - expectedFreeCapacityPercentage) * maxTableCapacity) / 100);
         long cSize = size;
         HeaderEntry nDrain;
         for (nDrain = head; nDrain.next != null && cSize > maxDesiredSize; nDrain = nDrain.next) {
@@ -412,7 +451,7 @@ final class QpackEncoderDynamicTable {
 
         /**
          * Number of header blocks that refer to this entry as the value for its <a
-         * href="https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-required-insert-count">
+         * href="https://www.rfc-editor.org/rfc/rfc9204.html#name-required-insert-count">
          * required insert count</a>
          */
         int refCount;

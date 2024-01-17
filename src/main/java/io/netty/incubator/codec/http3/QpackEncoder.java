@@ -21,8 +21,10 @@ import io.netty.incubator.codec.quic.QuicStreamChannel;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.collection.LongObjectHashMap;
 
-import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Map;
+import java.util.Queue;
 
 import static io.netty.incubator.codec.http3.Http3CodecUtils.closeOnFailure;
 import static io.netty.incubator.codec.http3.QpackHeaderField.sizeOf;
@@ -42,7 +44,7 @@ final class QpackEncoder {
     private final QpackEncoderDynamicTable dynamicTable;
     private int maxBlockedStreams;
     private int blockedStreams;
-    private LongObjectHashMap<StreamTracker> streamTrackers;
+    private LongObjectHashMap<Queue<Indices>> streamSectionTrackers;
 
     QpackEncoder() {
         this(new QpackEncoderDynamicTable());
@@ -66,32 +68,40 @@ final class QpackEncoder {
         ByteBuf tmp = allocator.buffer();
         try {
             int maxDynamicTblIdx = -1;
-            Map.Entry<CharSequence, CharSequence> maxDynamicTblIdxHeader = null;
+            int requiredInsertCount = 0;
+            Indices dynamicTableIndices = null;
             for (Map.Entry<CharSequence, CharSequence> header : headers) {
                 CharSequence name = header.getKey();
                 CharSequence value = header.getValue();
                 int dynamicTblIdx = encodeHeader(qpackAttributes, tmp, base, name, value);
-                if (dynamicTblIdx > maxDynamicTblIdx) {
-                    maxDynamicTblIdx = dynamicTblIdx;
-                    maxDynamicTblIdxHeader = header;
+                if (dynamicTblIdx >= 0) {
+                    int req = dynamicTable.addReferenceToEntry(name, value, dynamicTblIdx);
+                    if (dynamicTblIdx > maxDynamicTblIdx) {
+                        maxDynamicTblIdx = dynamicTblIdx;
+                        requiredInsertCount = req;
+                    }
+                    if (dynamicTableIndices == null) {
+                        dynamicTableIndices = new Indices();
+                    }
+                    dynamicTableIndices.add(dynamicTblIdx);
                 }
             }
-            int requiredInsertCount = 0;
-            if (maxDynamicTblIdx >= 0) {
-                requiredInsertCount = dynamicTable.addReferenceToEntry(maxDynamicTblIdxHeader.getKey(),
-                        maxDynamicTblIdxHeader.getValue(), maxDynamicTblIdx);
-                assert streamTrackers != null;
-                streamTrackers.computeIfAbsent(streamId, __ -> new StreamTracker())
-                        .add(maxDynamicTblIdx);
+
+            // Track all the indices that we need to ack later.
+            if (dynamicTableIndices != null) {
+                assert streamSectionTrackers != null;
+                streamSectionTrackers.computeIfAbsent(streamId, __ -> new ArrayDeque<>())
+                        .add(dynamicTableIndices);
             }
-            // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-encoded-field-section-prefi
+
+            // https://www.rfc-editor.org/rfc/rfc9204.html#name-encoded-field-section-prefi
             //   0   1   2   3   4   5   6   7
             // +---+---+---+---+---+---+---+---+
             // |   Required Insert Count (8+)  |
             // +---+---------------------------+
             // | S |      Delta Base (7+)      |
             // +---+---------------------------+
-            encodePrefixedInteger(out, (byte) 0b0, 8, requiredInsertCount);
+            encodePrefixedInteger(out, (byte) 0b0, 8, dynamicTable.encodedRequiredInsertCount(requiredInsertCount));
             if (base >= requiredInsertCount) {
                 encodePrefixedInteger(out, (byte) 0b0, 7, base - requiredInsertCount);
             } else {
@@ -110,7 +120,7 @@ final class QpackEncoder {
             final QuicStreamChannel encoderStream = attributes.encoderStream();
             dynamicTable.maxTableCapacity(maxTableCapacity);
             final ByteBuf tableCapacity = encoderStream.alloc().buffer(8);
-            // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-set-dynamic-table-capacity
+            // https://www.rfc-editor.org/rfc/rfc9204.html#name-set-dynamic-table-capacity
             //  0   1   2   3   4   5   6   7
             // +---+---+---+---+---+---+---+---+
             // | 0 | 0 | 1 |   Capacity (5+)   |
@@ -118,7 +128,7 @@ final class QpackEncoder {
             encodePrefixedInteger(tableCapacity, (byte) 0b0010_0000, 5, maxTableCapacity);
             closeOnFailure(encoderStream.writeAndFlush(tableCapacity));
 
-            streamTrackers = new LongObjectHashMap<>();
+            streamSectionTrackers = new LongObjectHashMap<>();
             maxBlockedStreams = blockedStreams;
         }
     }
@@ -130,19 +140,23 @@ final class QpackEncoder {
      * @param streamId For which the header fields section is acknowledged.
      */
     void sectionAcknowledgment(long streamId) throws QpackException {
-        assert streamTrackers != null;
-        final StreamTracker tracker = streamTrackers.get(streamId);
+        assert streamSectionTrackers != null;
+        final Queue<Indices> tracker = streamSectionTrackers.get(streamId);
         if (tracker == null) {
             throw INVALID_SECTION_ACKNOWLEDGMENT;
         }
 
-        int nextCount = tracker.takeNextInsertCount();
+        Indices dynamicTableIndices = tracker.poll();
+
         if (tracker.isEmpty()) {
-            streamTrackers.remove(streamId);
+            streamSectionTrackers.remove(streamId);
         }
-        if (nextCount > 0) {
-            dynamicTable.acknowledgeInsertCount(nextCount);
+
+        if (dynamicTableIndices == null) {
+            throw INVALID_SECTION_ACKNOWLEDGMENT;
         }
+
+        dynamicTableIndices.forEach(dynamicTable::acknowledgeInsertCountOnAck);
     }
 
     /**
@@ -152,12 +166,20 @@ final class QpackEncoder {
      * @param streamId which is cancelled.
      */
     void streamCancellation(long streamId) throws QpackException {
-        assert streamTrackers != null;
-        final StreamTracker tracker = streamTrackers.remove(streamId);
+        // If a configureDynamicTable(...) was called with a maxTableCapacity of 0 we will have not instanced
+        // streamSectionTrackers. The remote peer might still send a stream cancellation for a stream, while it
+        // is optional. See https://www.rfc-editor.org/rfc/rfc9204.html#section-2.2.2.2
+        if (streamSectionTrackers == null) {
+            return;
+        }
+        final Queue<Indices> tracker = streamSectionTrackers.remove(streamId);
         if (tracker != null) {
-            int nextCount;
-            while ((nextCount = tracker.takeNextInsertCount()) > 0) {
-                dynamicTable.acknowledgeInsertCount(nextCount);
+            for (;;) {
+                Indices dynamicTableIndices = tracker.poll();
+                if (dynamicTableIndices == null) {
+                    break;
+                }
+                dynamicTableIndices.forEach(dynamicTable::acknowledgeInsertCountOnCancellation);
             }
         }
     }
@@ -275,7 +297,7 @@ final class QpackEncoder {
             if (dynamicTable.requiresDuplication(idx, sizeOf(name, value))) {
                 idx = dynamicTable.add(name, value, sizeOf(name, value));
                 assert idx >= 0;
-                // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-duplicate
+                // https://www.rfc-editor.org/rfc/rfc9204.html#section-4.3.4
                 //  0   1   2   3   4   5   6   7
                 // +---+---+---+---+---+---+---+---+
                 // | 0 | 0 | 0 |    Index (5+)     |
@@ -338,7 +360,7 @@ final class QpackEncoder {
                 if (nameIdx >= 0) {
                     // 2 prefixed integers (name index and value length) each requires a maximum of 8 bytes
                     insert = encoderStream.alloc().buffer(value.length() + 16);
-                    // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-insert-with-name-reference
+                    // https://www.rfc-editor.org/rfc/rfc9204.html#name-insert-with-name-reference
                     //    0   1   2   3   4   5   6   7
                     // +---+---+---+---+---+---+---+---+
                     // | 1 | T |    Name Index (6+)    |
@@ -347,7 +369,7 @@ final class QpackEncoder {
                 } else {
                     // 2 prefixed integers (name and value length) each requires a maximum of 8 bytes
                     insert = encoderStream.alloc().buffer(name.length() + value.length() + 16);
-                    // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-insert-with-literal-name
+                    // https://www.rfc-editor.org/rfc/rfc9204.html#name-insert-with-literal-name
                     //     0   1   2   3   4   5   6   7
                     //   +---+---+---+---+---+---+---+---+
                     //   | 0 | 1 | H | Name Length (5+)  |
@@ -379,7 +401,7 @@ final class QpackEncoder {
     }
 
     private void encodeIndexedStaticTable(ByteBuf out, int index) {
-        // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-indexed-field-line
+        // https://www.rfc-editor.org/rfc/rfc9204.html#name-indexed-field-line
         //   0   1   2   3   4   5   6   7
         // +---+---+---+---+---+---+---+---+
         // | 1 | T |      Index (6+)       |
@@ -388,16 +410,16 @@ final class QpackEncoder {
     }
 
     private void encodeIndexedDynamicTable(ByteBuf out, int base, int index) {
-        // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-indexed-field-line
+        // https://www.rfc-editor.org/rfc/rfc9204.html#name-indexed-field-line
         //   0   1   2   3   4   5   6   7
         // +---+---+---+---+---+---+---+---+
         // | 1 | T |      Index (6+)       |
         // +---+---+-----------------------+
-        encodePrefixedInteger(out, (byte) 0b1000_0000, 6, base - index);
+        encodePrefixedInteger(out, (byte) 0b1000_0000, 6, base - index - 1);
     }
 
     private void encodePostBaseIndexed(ByteBuf out, int base, int index) {
-        // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-indexed-field-line-with-pos
+        // https://www.rfc-editor.org/rfc/rfc9204.html#name-indexed-field-line-with-pos
         //   0   1   2   3   4   5   6   7
         // +---+---+---+---+---+---+---+---+
         // | 0 | 0 | 0 | 1 |  Index (4+)   |
@@ -406,7 +428,7 @@ final class QpackEncoder {
     }
 
     private void encodeLiteralWithNameRefStaticTable(ByteBuf out, int nameIndex, CharSequence value) {
-        // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-literal-field-line-with-nam
+        // https://www.rfc-editor.org/rfc/rfc9204.html#name-literal-field-line-with-nam
         //     0   1   2   3   4   5   6   7
         //   +---+---+---+---+---+---+---+---+
         //   | 0 | 1 | N | T |Name Index (4+)|
@@ -421,7 +443,7 @@ final class QpackEncoder {
     }
 
     private void encodeLiteralWithNameRefDynamicTable(ByteBuf out, int base, int nameIndex, CharSequence value) {
-        // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-literal-field-line-with-nam
+        // https://www.rfc-editor.org/rfc/rfc9204.html#name-literal-field-line-with-nam
         //     0   1   2   3   4   5   6   7
         //   +---+---+---+---+---+---+---+---+
         //   | 0 | 1 | N | T |Name Index (4+)|
@@ -431,12 +453,12 @@ final class QpackEncoder {
         //   |  Value String (Length bytes)  |
         //   +-------------------------------+
         // TODO: Force N = 0 till we support sensitivity detector
-        encodePrefixedInteger(out, (byte) 0b0101_0000, 4, base - nameIndex);
+        encodePrefixedInteger(out, (byte) 0b0101_0000, 4, base - nameIndex - 1);
         encodeStringLiteral(out, value);
     }
 
     private void encodeLiteralWithPostBaseNameRef(ByteBuf out, int base, int nameIndex, CharSequence value) {
-        // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-literal-field-line-with-pos
+        // https://www.rfc-editor.org/rfc/rfc9204.html#name-literal-field-line-with-pos
         //    0   1   2   3   4   5   6   7
         //   +---+---+---+---+---+---+---+---+
         //   | 0 | 0 | 0 | 0 | N |NameIdx(3+)|
@@ -451,7 +473,7 @@ final class QpackEncoder {
     }
 
     private void encodeLiteral(ByteBuf out, CharSequence name, CharSequence value) {
-        // https://quicwg.org/base-drafts/draft-ietf-quic-qpack.html#name-literal-field-line-with-lit
+        // https://www.rfc-editor.org/rfc/rfc9204.html#name-literal-field-line-with-lit
         //   0   1   2   3   4   5   6   7
         //   +---+---+---+---+---+---+---+---+
         //   | 0 | 0 | 1 | N | H |NameLen(3+)|
@@ -495,13 +517,28 @@ final class QpackEncoder {
         return blockedStreams >= maxBlockedStreams - 1;
     }
 
-    private static final class StreamTracker extends ArrayList<Integer> {
-        StreamTracker() {
-            super(1); // we will mostly have a single header block in a stream.
+    private static final class Indices {
+        private int idx;
+        // Let's just assume 4 indices for now that we will store here as max.
+        private int[] array = new int[4];
+
+        void add(int index) {
+            if (idx == array.length) {
+                // Double it if needed.
+                array = Arrays.copyOf(array, array.length << 1);
+            }
+            array[idx++] = index;
         }
 
-        int takeNextInsertCount() {
-            return isEmpty() ? -1 : remove(0);
+        void forEach(IndexConsumer consumer) throws QpackException {
+            for (int i = 0; i < idx; i++) {
+                consumer.accept(array[i]);
+            }
+        }
+
+        @FunctionalInterface
+        interface IndexConsumer {
+            void accept(int idx) throws QpackException;
         }
     }
 }

@@ -32,7 +32,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: s4u/maven-settings-action@v2.2.0
+      - uses: s4u/maven-settings-action@v2.8.0
         with:
           servers: |
             [{
@@ -41,27 +41,19 @@ jobs:
                 "password": "${{ secrets.SONATYPE_PASSWORD }}"
             }]
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       # Cache .m2/repository
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
+        continue-on-error: true
         with:
           path: ~/.m2/repository
           key: deploy-cache-m2-repository-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
             deploy-cache-m2-repository-
 
-      # Enable caching of Docker layers
-      - uses: satackey/action-docker-layer-caching@v0.0.11
-        continue-on-error: true
-        with:
-          key: docker-cache-deploy-{hash}
-          restore-keys: |
-            docker-cache-deploy-
-            docker-cache-
-
       - name: Build docker image
-        run: docker-compose -f docker/docker-compose.centos-8.yaml -f docker/docker-compose.centos-8.18.yaml build
+        run: docker-compose -f docker/docker-compose.centos-7.yaml -f docker/docker-compose.centos-7.18.yaml build
 
       - name: Deploy project snapshot to sonatype
-        run: docker-compose -f docker/docker-compose.centos-8.yaml -f docker/docker-compose.centos-8.18.yaml run deploy
+        run: docker-compose -f docker/docker-compose.centos-7.yaml -f docker/docker-compose.centos-7.18.yaml run deploy

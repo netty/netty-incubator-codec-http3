@@ -26,7 +26,6 @@ import static io.netty.incubator.codec.http3.Http3.setQpackAttributes;
 import static io.netty.incubator.codec.http3.Http3ErrorCode.QPACK_DECODER_STREAM_ERROR;
 import static io.netty.incubator.codec.http3.Http3SettingsFrame.HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY;
 import static io.netty.incubator.codec.http3.QpackUtil.encodePrefixedInteger;
-import static java.lang.Math.floorDiv;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
@@ -242,6 +241,18 @@ public class QpackDecoderHandlerTest {
     }
 
     @Test
+    public void streamCancelDynamicTableWithMaxCapacity0() throws Exception {
+        setup(0);
+        encodeHeaders(headers -> headers.add(fooBar.name, fooBar.value));
+        verifyRequiredInsertCount(0);
+        verifyKnownReceivedCount(0);
+        // Send a stream cancellation for a dynamic table of capacity 0.
+        // See https://www.rfc-editor.org/rfc/rfc9204.html#section-2.2.2.2
+        sendStreamCancellation(decoderStream.streamId());
+        finishStreams(false);
+    }
+
+    @Test
     public void invalidIncrement() throws Exception {
         setup(128);
         Http3Exception e = assertThrows(Http3Exception.class, () -> sendInsertCountIncrement(2));
@@ -307,37 +318,42 @@ public class QpackDecoderHandlerTest {
         }
     }
 
-    private void setup(long tableCapacity) throws Exception {
-        maxEntries = Math.toIntExact(floorDiv(tableCapacity, 32));
+    private void setup(long maxTableCapacity) throws Exception {
+        maxEntries = Math.toIntExact(QpackUtil.maxEntries(maxTableCapacity));
         parent = new EmbeddedQuicChannel(true);
         attributes = new QpackAttributes(parent, false);
         setQpackAttributes(parent, attributes);
         Http3SettingsFrame settings = new DefaultHttp3SettingsFrame();
-        settings.put(HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY, tableCapacity);
-        QpackDecoder decoder = new QpackDecoder(settings);
+        settings.put(HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY, maxTableCapacity);
+        QpackDecoder decoder = new QpackDecoder(maxTableCapacity, 0);
         encoderStream = (EmbeddedQuicStreamChannel) parent.createStream(QuicStreamType.UNIDIRECTIONAL,
-                new QpackEncoderHandler(tableCapacity, decoder)).get();
+                new QpackEncoderHandler(maxTableCapacity, decoder)).get();
         attributes.encoderStream(encoderStream);
         encoder = new QpackEncoder(dynamicTable);
-        encoder.configureDynamicTable(attributes, tableCapacity, 0);
+        encoder.configureDynamicTable(attributes, maxTableCapacity, 0);
         decoderStream = (EmbeddedQuicStreamChannel) parent.createStream(QuicStreamType.UNIDIRECTIONAL,
                 new QpackDecoderHandler(encoder)).get();
         attributes.decoderStream(decoderStream);
     }
 
     private void finishStreams() {
+        finishStreams(true);
+    }
+
+    private void finishStreams(boolean encoderPendingMessage) {
         assertThat("Unexpected decoder stream message", decoderStream.finishAndReleaseAll(), is(false));
-        assertThat("Unexpected encoder stream message", encoderStream.finishAndReleaseAll(), is(true));
+        assertThat("Unexpected encoder stream message", encoderStream.finishAndReleaseAll(), is(encoderPendingMessage));
         assertThat("Unexpected parent stream message", parent.finishAndReleaseAll(), is(false));
     }
 
     private void verifyRequiredInsertCount(int insertCount) {
-        assertThat("Unexpected dynamic table insert count.", dynamicTable.requiredInsertCount(),
+        assertThat("Unexpected dynamic table insert count.",
+                dynamicTable.encodedRequiredInsertCount(dynamicTable.insertCount()),
                 is(insertCount == 0 ? 0 : insertCount % maxEntries + 1));
     }
 
     private void verifyKnownReceivedCount(int receivedCount) {
-        assertThat("Unexpected dynamic table known received count.", dynamicTable.knownReceivedCount(),
+        assertThat("Unexpected dynamic table known received count.", dynamicTable.encodedKnownReceivedCount(),
                 is(receivedCount == 0 ? 0 : receivedCount % maxEntries + 1));
     }
 }

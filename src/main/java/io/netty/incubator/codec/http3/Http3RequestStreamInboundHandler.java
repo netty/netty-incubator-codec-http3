@@ -15,7 +15,6 @@
  */
 package io.netty.incubator.codec.http3;
 
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.socket.ChannelInputShutdownEvent;
@@ -31,44 +30,24 @@ import io.netty.util.internal.logging.InternalLoggerFactory;
 public abstract class Http3RequestStreamInboundHandler extends ChannelInboundHandlerAdapter {
     private static final InternalLogger logger =
             InternalLoggerFactory.getInstance(Http3RequestStreamInboundHandler.class);
-    private static final Http3DataFrame EMPTY = new DefaultHttp3DataFrame(Unpooled.EMPTY_BUFFER);
-    private boolean lastFrameDetected;
-    private boolean firstFrameReceived;
-
-    /**
-     * Always returns {@code true} as this handler and sub-types are not sharable, due internal state.
-     */
-    @Override
-    public final boolean isSharable() {
-        return false;
-    }
 
     @Override
     public final void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        firstFrameReceived = true;
-        boolean inputShutdown = ((QuicStreamChannel) ctx.channel()).isInputShutdown();
         if (msg instanceof Http3UnknownFrame) {
             channelRead(ctx, (Http3UnknownFrame) msg);
-            if (inputShutdown) {
-                notifyLast(ctx);
-            }
+        } else if (msg instanceof Http3HeadersFrame) {
+            channelRead(ctx, (Http3HeadersFrame) msg);
+        } else if (msg instanceof Http3DataFrame) {
+            channelRead(ctx, (Http3DataFrame) msg);
         } else {
-            if (inputShutdown) {
-                lastFrameDetected = true;
-            }
-            if (msg instanceof Http3HeadersFrame) {
-                channelRead(ctx, (Http3HeadersFrame) msg, inputShutdown);
-            }
-            if (msg instanceof Http3DataFrame) {
-                channelRead(ctx, (Http3DataFrame) msg, inputShutdown);
-            }
+            super.channelRead(ctx, msg);
         }
     }
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt == ChannelInputShutdownEvent.INSTANCE) {
-            notifyLast(ctx);
+            channelInputClosed(ctx);
         }
         ctx.fireUserEventTriggered(evt);
     }
@@ -84,34 +63,31 @@ public abstract class Http3RequestStreamInboundHandler extends ChannelInboundHan
         }
     }
 
-    private void notifyLast(ChannelHandlerContext ctx) throws Exception {
-        if (!lastFrameDetected && firstFrameReceived) {
-            lastFrameDetected = true;
-            channelRead(ctx, EMPTY, true);
-        }
-    }
-
     /**
      * Called once a {@link Http3HeadersFrame} is ready for this stream to process.
      *
      * @param ctx           the {@link ChannelHandlerContext} of this handler.
      * @param frame         the {@link Http3HeadersFrame} that was read
-     * @param isLast        {@code true} if this is the last frame that will be read for this stream.
      * @throws Exception    thrown if an error happens during processing.
      */
-    protected abstract void channelRead(ChannelHandlerContext ctx, Http3HeadersFrame frame, boolean isLast)
-            throws Exception;
+    protected abstract void channelRead(ChannelHandlerContext ctx, Http3HeadersFrame frame) throws Exception;
 
     /**
      * Called once a {@link Http3DataFrame} is ready for this stream to process.
      *
      * @param ctx           the {@link ChannelHandlerContext} of this handler.
      * @param frame         the {@link Http3DataFrame} that was read
-     * @param isLast        {@code true} if this is the last frame that will be read for this stream.
      * @throws Exception    thrown if an error happens during processing.
      */
-    protected abstract void channelRead(ChannelHandlerContext ctx, Http3DataFrame frame, boolean isLast)
-            throws Exception;
+    protected abstract void channelRead(ChannelHandlerContext ctx, Http3DataFrame frame) throws Exception;
+
+    /**
+     * Called once the input is closed and so no more inbound data is received on it.
+     *
+     * @param ctx           the {@link ChannelHandlerContext} of this handler.
+     * @throws Exception    thrown if an error happens during processing.
+     */
+    protected abstract void channelInputClosed(ChannelHandlerContext ctx) throws Exception;
 
     /**
      * Called once a {@link Http3UnknownFrame} is ready for this stream to process. By default these frames are just

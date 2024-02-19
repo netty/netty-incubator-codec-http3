@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 The Netty Project
+ * Copyright 2024 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -15,10 +15,7 @@
  */
 
 /**
- * <a href="https://tools.ietf.org/html/draft-ietf-quic-http-32">HTTP/3</a> implementation.
+ *
  */
 
-@NotNullByDefault
-package io.netty.incubator.codec.http3;
-
-import io.netty.incubator.codec.http3.internal.NotNullByDefault;
+package io.netty.incubator.codec.http3.internal;

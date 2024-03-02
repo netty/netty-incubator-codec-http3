@@ -21,4 +21,3 @@
 @NotNullByDefault
 package io.netty.incubator.codec.http3;
 
-import io.netty.incubator.codec.http3.internal.NotNullByDefault;

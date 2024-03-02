@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package io.netty.incubator.codec.http3.internal;
+package io.netty.incubator.codec.http3;
 
 
 import org.jetbrains.annotations.NotNull;

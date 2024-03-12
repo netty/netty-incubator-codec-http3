@@ -39,5 +39,5 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.CLASS)
 @Target(ElementType.PACKAGE)
 @NotNull
-public @interface NotNullByDefault {
+@interface NotNullByDefault {
 }

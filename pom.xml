@@ -24,7 +24,7 @@
 
   <groupId>io.netty.incubator</groupId>
   <artifactId>netty-incubator-codec-http3</artifactId>
-  <version>0.0.26.Final-SNAPSHOT</version>
+  <version>0.0.28.Final-SNAPSHOT</version>
   <name>Netty/Incubator/Codec/Http3</name>
   <packaging>jar</packaging>
   <url>https://netty.io/</url>
@@ -68,9 +68,9 @@
   <properties>
     <javaModuleName>io.netty.incubator.codec.http3</javaModuleName>
     <skipTests>false</skipTests>
-    <netty.version>4.1.107.Final</netty.version>
+    <netty.version>4.1.108.Final</netty.version>
     <netty.build.version>31</netty.build.version>
-    <netty.quic.version>0.0.57.Final</netty.quic.version>
+    <netty.quic.version>0.0.62.Final</netty.quic.version>
     <netty.quic.classifier>${os.detected.name}-${os.detected.arch}</netty.quic.classifier>
     <junit.version>5.9.0</junit.version>
     <release.gpg.keyname />

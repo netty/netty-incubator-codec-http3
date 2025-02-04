@@ -16,7 +16,7 @@
 package io.netty.incubator.codec.http3;
 
 
-import com.google.common.net.HttpHeaders;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.util.AsciiString;
 import org.junit.jupiter.api.Test;
 
@@ -160,7 +160,7 @@ public class Http3HeadersSinkTest {
         sink.accept(Http3Headers.PseudoHeaderName.METHOD.value(), "OPTIONS");
         sink.accept(Http3Headers.PseudoHeaderName.PATH.value(), "/something");
         sink.accept(Http3Headers.PseudoHeaderName.SCHEME.value(), "https");
-        sink.accept(new AsciiString(HttpHeaders.HOST.toLowerCase()), "example.com:4433");
+        sink.accept(new AsciiString(HttpHeaderNames.HOST), "example.com:4433");
         sink.finish();
     }
 
@@ -179,7 +179,7 @@ public class Http3HeadersSinkTest {
         sink.accept(Http3Headers.PseudoHeaderName.METHOD.value(), "GET");
         sink.accept(Http3Headers.PseudoHeaderName.PATH.value(), "/");
         sink.accept(Http3Headers.PseudoHeaderName.SCHEME.value(), "https");
-        sink.accept(new AsciiString(HttpHeaders.HOST.toLowerCase()), "example.com:4433");
+        sink.accept(new AsciiString(HttpHeaderNames.HOST), "example.com:4433");
         sink.finish();
     }
 

@@ -15,6 +15,7 @@
  */
 package io.netty.incubator.codec.http3;
 
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 
 import java.util.function.BiConsumer;
@@ -124,7 +125,8 @@ final class Http3HeadersSink implements BiConsumer<CharSequence, CharSequence> {
      * https://www.rfc-editor.org/rfc/rfc9110#section-7.2
      */
     private boolean authorityOrHostHeaderReceived() {
-        return (receivedPseudoHeaders & AUTHORITY.getFlag()) == AUTHORITY.getFlag() || headers.contains("host");
+        return (receivedPseudoHeaders & AUTHORITY.getFlag()) == AUTHORITY.getFlag() ||
+                headers.contains(HttpHeaderNames.HOST);
     }
 
     @Override

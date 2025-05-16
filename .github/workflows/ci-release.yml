@@ -58,9 +58,9 @@ jobs:
         with:
           servers: |
             [{
-                "id": "sonatype-nexus",
-                "username": "${{ secrets.SONATYPE_USERNAME }}",
-                "password": "${{ secrets.SONATYPE_PASSWORD }}"
+                "id": "central",
+                "username": "${{ secrets.MAVEN_CENTRAL_USERNAME }}",
+                "password": "${{ secrets.MAVEN_CENTRAL_PASSWORD }}"
             }]
 
       # Cache .m2/repository

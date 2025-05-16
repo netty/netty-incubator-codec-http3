@@ -252,16 +252,13 @@
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.sonatype.plugins</groupId>
-        <artifactId>nexus-staging-maven-plugin</artifactId>
-        <version>1.6.13</version>
+        <groupId>org.sonatype.central</groupId>
+        <artifactId>central-publishing-maven-plugin</artifactId>
+        <version>0.7.0</version>
         <extensions>true</extensions>
         <configuration>
-          <serverId>sonatype-nexus</serverId>
-          <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-          <!-- Automatically release the artifacts after the verification was complete -->
-          <autoReleaseAfterClose>false</autoReleaseAfterClose>
-          <skipStagingRepositoryClose>true</skipStagingRepositoryClose>
+          <publishingServerId>central</publishingServerId>
+          <centralSnapshotsUrl>https://central.sonatype.com/repository/maven-snapshots/</centralSnapshotsUrl>
         </configuration>
       </plugin>
       <plugin>

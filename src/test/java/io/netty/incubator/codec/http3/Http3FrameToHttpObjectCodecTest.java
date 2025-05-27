@@ -27,6 +27,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
+import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.DuplexChannel;
@@ -58,9 +59,17 @@ import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 import io.netty.incubator.codec.quic.InsecureQuicTokenHandler;
 import io.netty.incubator.codec.quic.QuicChannel;
+import io.netty.incubator.codec.quic.QuicSslContext;
 import io.netty.incubator.codec.quic.QuicSslContextBuilder;
 import io.netty.incubator.codec.quic.QuicStreamChannel;
+import io.netty.incubator.codec.quic.QuicStreamChannelBootstrap;
 import io.netty.util.CharsetUtil;
+import io.netty.util.NetUtil;
+import io.netty.util.ReferenceCountUtil;
+import io.netty.util.concurrent.Promise;
+import io.netty.util.concurrent.ScheduledFuture;
+import io.netty.util.internal.logging.InternalLogger;
+import io.netty.util.internal.logging.InternalLoggerFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -70,6 +79,7 @@ import org.junit.jupiter.params.provider.ArgumentsSource;
 
 import java.nio.CharBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
@@ -77,6 +87,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import static org.hamcrest.CoreMatchers.is;
@@ -92,6 +103,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class Http3FrameToHttpObjectCodecTest {
+    private static final InternalLogger logger = InternalLoggerFactory.getInstance(Http3FrameToHttpObjectCodecTest.class);
 
     @Test
     public void testUpgradeEmptyFullResponse() {
@@ -1084,4 +1096,222 @@ data.release();
         assertNotNull(ex.getMessage());
         assertFalse(ch.finish());
     }
+
+    private static final String CHAR_POOL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+    private static final SecureRandom random = new SecureRandom();
+
+    public static String generateRandomString(int length) {
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            int index = random.nextInt(CHAR_POOL.length());
+            sb.append(CHAR_POOL.charAt(index));
+        }
+        return sb.toString();
+    }
+
+    @Test
+    public void testSingleThreadedChannelCapacityLeakWhenSendingManyMessages() throws InterruptedException, CertificateException, ExecutionException {
+        String text = generateRandomString(64);
+        AtomicInteger receivedCount = new AtomicInteger();
+        AtomicInteger sentCount = new AtomicInteger();
+        EventLoopGroup group = new NioEventLoopGroup(1);
+        EventLoop eventLoop = group.next();
+        Promise<Boolean> finishedPromise = eventLoop.newPromise();
+        finishedPromise.addListener(future -> {
+            logger.info("The sent count is : {} and the received count is : {}", sentCount.get(), receivedCount.get());
+        });
+        channelCapacityLeakDetector(group, finishedPromise, ctx -> {
+            while (!finishedPromise.isDone()) {
+                sentCount.incrementAndGet();
+                writeMessage(ctx, text);
+            }
+        }, ctx -> {
+            receivedCount.incrementAndGet();
+        });
+
+        finishedPromise.await(60, TimeUnit.SECONDS);
+        assertTrue(finishedPromise.isDone());
+        assertTrue(finishedPromise.isSuccess());
+    }
+
+    @Test
+    public void testMultiThreadedChannelCapacityLeakWhenSendingManyMessages() throws InterruptedException, CertificateException, ExecutionException {
+        String text = generateRandomString(64);
+        AtomicInteger receivedCount = new AtomicInteger();
+        AtomicInteger sentCount = new AtomicInteger();
+        EventLoopGroup group = new NioEventLoopGroup(1);
+        EventLoop eventLoop = group.next();
+        Promise<Boolean> finishedPromise = eventLoop.newPromise();
+        finishedPromise.addListener(future -> {
+            logger.info("The sent count is : {} and the received count is : {}", sentCount.get(), receivedCount.get());
+        });
+        channelCapacityLeakDetector(group, finishedPromise, ctx -> {
+            while (!finishedPromise.isDone()) {
+                int batchCount = 100;
+                Thread[] threads = new Thread[batchCount];
+                for (int i = 0; i < batchCount; i++) {
+                    threads[i] = new Thread(() -> {
+                        sentCount.incrementAndGet();
+                        writeMessage(ctx, text);
+                    });
+                }
+                for (Thread thread : threads) {
+                    thread.start();
+                }
+            }
+        }, ctx -> {
+            receivedCount.incrementAndGet();
+        });
+        finishedPromise.await(10, TimeUnit.SECONDS);
+        assertTrue(finishedPromise.isDone());
+        assertTrue(finishedPromise.isSuccess());
+    }
+
+    private ScheduledFuture<?> scheduledFuture;
+
+    @Test
+    public void testScheduledTaskChannelCapacityLeakWhenSendingManyMessages() throws InterruptedException, CertificateException, ExecutionException {
+        String text = generateRandomString(64);
+        AtomicInteger receivedCount = new AtomicInteger();
+        AtomicInteger sentCount = new AtomicInteger();
+        EventLoopGroup group = new NioEventLoopGroup(1);
+        EventLoop eventLoop = group.next();
+        Promise<Boolean> finishedPromise = eventLoop.newPromise();
+        finishedPromise.addListener(future -> {
+            logger.info("The sent count is : {} and the received count is : {}", sentCount.get(), receivedCount.get());
+            scheduledFuture.cancel(false);
+        });
+
+        channelCapacityLeakDetector(group, finishedPromise, ctx -> {
+            scheduledFuture = ctx.executor().scheduleWithFixedDelay(() -> {
+                sentCount.incrementAndGet();
+                writeMessage(ctx, text);
+            }, 0, 1, TimeUnit.MILLISECONDS);
+        }, ctx -> {
+            receivedCount.incrementAndGet();
+        });
+
+        finishedPromise.await(10, TimeUnit.SECONDS);
+        assertTrue(finishedPromise.isDone());
+        assertTrue(finishedPromise.isSuccess());
+    }
+
+    private void channelCapacityLeakDetector(EventLoopGroup group, Promise<Boolean> finishedPromise, final ContextHandler serverBulkMessageSender,
+                                             ContextHandler clientChannelInboundHandler)
+            throws InterruptedException, CertificateException, ExecutionException {
+        QuicStreamChannelBootstrap streamChannelBootstrap = initQuicClientAndServer(group, new Http3RequestStreamInboundHandler() {
+            @Override
+            protected void channelRead(ChannelHandlerContext ctx, Http3HeadersFrame frame) throws Exception {
+                DefaultHttp3HeadersFrame responseHeaders = new DefaultHttp3HeadersFrame();
+                responseHeaders.headers().status(HttpResponseStatus.OK.codeAsText());
+                ctx.write(responseHeaders, ctx.voidPromise());
+                ctx.flush();
+                serverBulkMessageSender.handle(ctx);
+                ((DuplexChannel) ctx.channel()).shutdownOutput();
+            }
+
+            @Override
+            protected void channelRead(ChannelHandlerContext ctx, Http3DataFrame frame) throws Exception {
+            }
+
+            @Override
+            protected void channelInputClosed(ChannelHandlerContext ctx) throws Exception {
+            }
+
+            @Override
+            public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception {
+                logger.info("ChannelWritabilityChanged is called in server");
+                finishedPromise.trySuccess(true);
+                super.channelWritabilityChanged(ctx);
+            }
+        }, new Http3RequestStreamInboundHandler() {
+            @Override
+            protected void channelRead(ChannelHandlerContext ctx, Http3HeadersFrame frame) throws Exception {
+            }
+
+            @Override
+            protected void channelRead(ChannelHandlerContext ctx, Http3DataFrame frame) throws Exception {
+                ReferenceCountUtil.release(frame);
+
+                clientChannelInboundHandler.handle(ctx);
+            }
+
+            @Override
+            protected void channelInputClosed(ChannelHandlerContext ctx) throws Exception {
+            }
+        });
+
+        Http3HeadersFrame frame = new DefaultHttp3HeadersFrame();
+        frame.headers().method("GET").path("/")
+                .authority(NetUtil.LOCALHOST4.getHostAddress() + ":" + 0).scheme("https");
+        streamChannelBootstrap.create().get().writeAndFlush(frame).addListener(QuicStreamChannel.SHUTDOWN_OUTPUT);
+
+        finishedPromise.addListener(future -> group.shutdownGracefully());
+    }
+
+    private interface ContextHandler {
+        void handle(ChannelHandlerContext ctx);
+    }
+
+    private static void writeMessage(ChannelHandlerContext ctx, String text) {
+        ctx.writeAndFlush(new DefaultHttp3DataFrame(ByteBufUtil.encodeString(
+                        ctx.alloc(), CharBuffer.wrap(text), CharsetUtil.UTF_8)),
+                ctx.newPromise());
+        QuicStreamChannel streamChannel = (QuicStreamChannel) ctx.channel();
+        logger.info("{} - Write data for channelId: {}, streamId: {}, capacity: {}",
+                "SERVER", streamChannel.id(), streamChannel.streamId(), streamChannel.bytesBeforeUnwritable());
+    }
+
+    private QuicStreamChannelBootstrap initQuicClientAndServer(EventLoopGroup group, Http3RequestStreamInboundHandler serverRequestHandler, Http3RequestStreamInboundHandler clientStreamHandler) throws InterruptedException, CertificateException, ExecutionException {
+        Bootstrap bootstrap = new Bootstrap()
+                .channel(NioDatagramChannel.class)
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(Channel ch) throws Exception {
+                        // initialized below
+                    }
+                })
+                .group(group);
+
+        SelfSignedCertificate cert = new SelfSignedCertificate();
+
+        Channel server = bootstrap.bind("127.0.0.1", 0).sync().channel();
+
+
+        QuicSslContext serverSskContext = QuicSslContextBuilder.forServer(cert.key(), null, cert.cert())
+                .applicationProtocols(Http3.supportedApplicationProtocols())
+                .build();
+        server.pipeline().addLast(Http3.newQuicServerCodecBuilder()
+                .initialMaxData(10000000)
+                .initialMaxStreamDataBidirectionalLocal(1000000)
+                .initialMaxStreamDataBidirectionalRemote(1000000)
+                .initialMaxStreamsBidirectional(100)
+                .sslContext(serverSskContext)
+                .tokenHandler(InsecureQuicTokenHandler.INSTANCE)
+                .handler(new Http3ServerConnectionHandler(serverRequestHandler))
+                .build());
+
+        Channel client = bootstrap.bind("127.0.0.1", 0).sync().channel();
+        client.config().setAutoRead(true);
+        QuicSslContext clientSslContext = QuicSslContextBuilder.forClient()
+                .trustManager(InsecureTrustManagerFactory.INSTANCE)
+                .applicationProtocols(Http3.supportedApplicationProtocols())
+                .build();
+        client.pipeline().addLast(Http3.newQuicClientCodecBuilder()
+                .initialMaxData(10000000)
+                .initialMaxStreamDataBidirectionalLocal(1000000)
+                .sslContext(clientSslContext)
+                .build());
+
+        QuicChannel quicChannel = QuicChannel.newBootstrap(client)
+                .handler(new Http3ClientConnectionHandler())
+                .remoteAddress(server.localAddress())
+                .localAddress(client.localAddress())
+                .connect().get();
+
+
+        return Http3.newRequestStreamBootstrap(quicChannel, clientStreamHandler);
+    }
+
 }

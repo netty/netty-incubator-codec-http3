@@ -26,10 +26,9 @@ import static io.netty.incubator.codec.http3.Http3.setQpackAttributes;
 import static io.netty.incubator.codec.http3.Http3ErrorCode.QPACK_DECODER_STREAM_ERROR;
 import static io.netty.incubator.codec.http3.Http3SettingsFrame.HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY;
 import static io.netty.incubator.codec.http3.QpackUtil.encodePrefixedInteger;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.instanceOf;
-import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class QpackDecoderHandlerTest {
@@ -54,7 +53,7 @@ public class QpackDecoderHandlerTest {
         encodeHeaders(headers -> headers.add(fooBar.name, fooBar.value));
 
         Http3Exception e = assertThrows(Http3Exception.class, () -> sendAckForStreamId(decoderStream.streamId()));
-        assertThat(e.getCause(), instanceOf(QpackException.class));
+        assertInstanceOf(QpackException.class, e.getCause());
 
         Http3TestUtils.verifyClose(QPACK_DECODER_STREAM_ERROR, parent);
         finishStreams();
@@ -83,7 +82,7 @@ public class QpackDecoderHandlerTest {
         setup(128);
 
         Http3Exception e = assertThrows(Http3Exception.class, () -> sendAckForStreamId(1));
-        assertThat(e.getCause(), instanceOf(QpackException.class));
+        assertInstanceOf(QpackException.class, e.getCause());
 
         Http3TestUtils.verifyClose(QPACK_DECODER_STREAM_ERROR, parent);
         finishStreams();
@@ -99,7 +98,7 @@ public class QpackDecoderHandlerTest {
         sendAckForStreamId(decoderStream.streamId());
 
         Http3Exception e = assertThrows(Http3Exception.class, () -> sendAckForStreamId(decoderStream.streamId()));
-        assertThat(e.getCause(), instanceOf(QpackException.class));
+        assertInstanceOf(QpackException.class, e.getCause());
 
         Http3TestUtils.verifyClose(QPACK_DECODER_STREAM_ERROR, parent);
         finishStreams();
@@ -155,7 +154,7 @@ public class QpackDecoderHandlerTest {
         sendStreamCancellation(decoderStream.streamId());
 
         Http3Exception e = assertThrows(Http3Exception.class, () -> sendAckForStreamId(decoderStream.streamId()));
-        assertThat(e.getCause(), instanceOf(QpackException.class));
+        assertInstanceOf(QpackException.class, e.getCause());
 
         Http3TestUtils.verifyClose(QPACK_DECODER_STREAM_ERROR, parent);
         finishStreams();
@@ -256,7 +255,7 @@ public class QpackDecoderHandlerTest {
     public void invalidIncrement() throws Exception {
         setup(128);
         Http3Exception e = assertThrows(Http3Exception.class, () -> sendInsertCountIncrement(2));
-        assertThat(e.getCause(), instanceOf(QpackException.class));
+        assertInstanceOf(QpackException.class, e.getCause());
 
         Http3TestUtils.verifyClose(QPACK_DECODER_STREAM_ERROR, parent);
         finishStreams();
@@ -341,19 +340,19 @@ public class QpackDecoderHandlerTest {
     }
 
     private void finishStreams(boolean encoderPendingMessage) {
-        assertThat("Unexpected decoder stream message", decoderStream.finishAndReleaseAll(), is(false));
-        assertThat("Unexpected encoder stream message", encoderStream.finishAndReleaseAll(), is(encoderPendingMessage));
-        assertThat("Unexpected parent stream message", parent.finishAndReleaseAll(), is(false));
+        assertFalse(decoderStream.finishAndReleaseAll(), "Unexpected decoder stream message");
+        assertEquals(encoderPendingMessage, encoderStream.finishAndReleaseAll(),  "Unexpected encoder stream message");
+        assertFalse(parent.finishAndReleaseAll(), "Unexpected parent stream message");
     }
 
     private void verifyRequiredInsertCount(int insertCount) {
-        assertThat("Unexpected dynamic table insert count.",
+        assertEquals(insertCount == 0 ? 0 : insertCount % maxEntries + 1,
                 dynamicTable.encodedRequiredInsertCount(dynamicTable.insertCount()),
-                is(insertCount == 0 ? 0 : insertCount % maxEntries + 1));
+                "Unexpected dynamic table insert count.");
     }
 
     private void verifyKnownReceivedCount(int receivedCount) {
-        assertThat("Unexpected dynamic table known received count.", dynamicTable.encodedKnownReceivedCount(),
-                is(receivedCount == 0 ? 0 : receivedCount % maxEntries + 1));
+        assertEquals(receivedCount == 0 ? 0 : receivedCount % maxEntries + 1, dynamicTable.encodedKnownReceivedCount(),
+                "Unexpected dynamic table known received count.");
     }
 }

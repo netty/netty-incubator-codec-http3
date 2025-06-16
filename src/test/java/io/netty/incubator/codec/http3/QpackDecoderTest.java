@@ -28,8 +28,7 @@ import static io.netty.incubator.codec.http3.QpackDecoderStateSyncStrategy.ackEa
 import static io.netty.incubator.codec.http3.QpackUtil.MAX_UNSIGNED_INT;
 import static java.lang.Math.toIntExact;
 import static java.util.Arrays.asList;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 public class QpackDecoderTest {
@@ -131,7 +130,7 @@ public class QpackDecoderTest {
 
     private void encodeDecodeVerifyRequiredInsertCount(int count) throws QpackException {
         final int ric = encodeDecodeRequiredInsertCount(count);
-        assertThat(ric, is(count));
+        assertEquals(count, ric);
     }
 
     private int encodeDecodeDeltaBase(int requiredInsertCount, boolean postBase, int deltaBase) throws QpackException {
@@ -159,11 +158,11 @@ public class QpackDecoderTest {
             inserted++;
             decoder.insertLiteral(decoderStream, FOO + i, BAR + i);
         }
-        assertThat(decoderStream.finishAndReleaseAll(), is(count > 0));
+        assertEquals(count > 0, decoderStream.finishAndReleaseAll());
     }
 
     private void verifyField(QpackHeaderField field, int fieldIndexWhenInserted) {
-        assertThat(field.name, is(FOO + fieldIndexWhenInserted));
-        assertThat(field.value, is(BAR + fieldIndexWhenInserted));
+        assertEquals(FOO + fieldIndexWhenInserted, field.name);
+        assertEquals(BAR + fieldIndexWhenInserted, field.value);
     }
 }

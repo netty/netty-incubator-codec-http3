@@ -18,10 +18,8 @@ package io.netty.incubator.codec.http3;
 import io.netty.buffer.ByteBuf;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ReferenceCounted;
-import org.hamcrest.CoreMatchers;
-import org.hamcrest.MatcherAssert;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 final class Http3TestUtils {
@@ -29,7 +27,7 @@ final class Http3TestUtils {
     private Http3TestUtils() { }
 
     static void assertException(Http3ErrorCode code, Throwable e) {
-        MatcherAssert.assertThat(e, CoreMatchers.instanceOf(Http3Exception.class));
+        assertInstanceOf(Http3Exception.class, e);
         Http3Exception exception = (Http3Exception) e;
         assertEquals(code, exception.errorCode());
     }

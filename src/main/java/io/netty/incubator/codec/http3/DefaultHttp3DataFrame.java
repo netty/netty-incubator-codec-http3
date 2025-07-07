@@ -21,8 +21,21 @@ import io.netty.util.internal.StringUtil;
 
 public final class DefaultHttp3DataFrame extends DefaultByteBufHolder implements Http3DataFrame {
 
+    private final boolean fin;
+
     public DefaultHttp3DataFrame(ByteBuf data) {
         super(data);
+        this.fin = false;
+    }
+
+    public DefaultHttp3DataFrame(ByteBuf data, boolean fin) {
+        super(data);
+        this.fin = fin;
+    }
+
+    @Override
+    public boolean hasFin() {
+        return fin;
     }
 
     @Override

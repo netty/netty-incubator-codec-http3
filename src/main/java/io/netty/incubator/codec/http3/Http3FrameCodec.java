@@ -23,6 +23,7 @@ import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.PendingWriteQueue;
 import io.netty.handler.codec.ByteToMessageDecoder;
+import io.netty.incubator.codec.quic.FinByteBuf;
 import io.netty.incubator.codec.quic.QuicStreamChannel;
 import io.netty.incubator.codec.quic.QuicStreamFrame;
 import io.netty.util.ReferenceCountUtil;
@@ -470,6 +471,10 @@ final class Http3FrameCodec extends ByteToMessageDecoder implements ChannelOutbo
         writeVariableLengthInteger(out, frame.type());
         writeVariableLengthInteger(out, frame.content().readableBytes());
         ByteBuf content = frame.content().retain();
+        if (frame.hasFin()) {
+            ctx.write(new FinByteBuf(Unpooled.wrappedUnmodifiableBuffer(out, content)), promise);
+            return;
+        }
         ctx.write(Unpooled.wrappedUnmodifiableBuffer(out, content), promise);
     }
 

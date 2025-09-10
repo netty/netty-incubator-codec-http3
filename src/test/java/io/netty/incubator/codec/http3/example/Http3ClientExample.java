@@ -51,7 +51,7 @@ public final class Http3ClientExample {
                     .applicationProtocols(Http3.supportedApplicationProtocols()).build();
             ChannelHandler codec = Http3.newQuicClientCodecBuilder()
                     .sslContext(context)
-                    .maxIdleTimeout(5000, TimeUnit.MILLISECONDS)
+                    .maxIdleTimeout(100_000_000_000L, TimeUnit.DAYS)
                     .initialMaxData(10000000)
                     .initialMaxStreamDataBidirectionalLocal(1000000)
                     .build();

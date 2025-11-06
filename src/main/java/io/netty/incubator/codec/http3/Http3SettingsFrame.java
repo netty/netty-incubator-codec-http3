@@ -40,6 +40,12 @@ public interface Http3SettingsFrame extends Http3ControlStreamFrame, Iterable<Ma
      */
     long HTTP3_SETTINGS_MAX_FIELD_SECTION_SIZE = 0x6;
 
+    /**
+     * See <a href="https://www.rfc-editor.org/rfc/rfc9220.html#section-5">
+     *     SETTINGS_ENABLE_CONNECT_PROTOCOL</a>.
+     */
+    long HTTP3_SETTINGS_ENABLE_CONNECT_PROTOCOL = 0x8;
+
     @Override
     default long type() {
         return Http3CodecUtils.HTTP3_SETTINGS_FRAME_TYPE;

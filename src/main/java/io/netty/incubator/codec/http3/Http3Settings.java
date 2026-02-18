@@ -38,7 +38,7 @@ import static io.netty.util.internal.ObjectUtil.checkNotNull;
  *   <li>{@code ENABLE_CONNECT_PROTOCOL} (0x8)</li>
  * </ul>
  *
- * Non-standard settings are permitted as long as they use positive values.
+ * Non-standard settings are ignored
  * Reserved HTTP/2 setting identifiers are rejected.
  *
  */
@@ -55,8 +55,12 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
      * HTTP/3 SETTINGS registry (IANA)</a>.
      * <br>
      * Controls the maximum size of the dynamic table used by QPACK.
+     *
+     * @deprecated use {@link Http3SettingIdentifier#HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY}.
      */
-    public static final long HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY = 0x1;
+    @Deprecated
+    public static final long HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY =
+            Http3SettingIdentifier.HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY.id();
 
     /**
      * Maximum field section size setting identifier (<b>0x6</b>).
@@ -69,8 +73,12 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
      * HTTP/3 SETTINGS registry (IANA)</a>.
      * <br>
      * Specifies the upper bound on the total size of HTTP field sections accepted by a peer.
+     *
+     * @deprecated use {@link Http3SettingIdentifier#HTTP3_SETTINGS_MAX_FIELD_SECTION_SIZE}.
      */
-    public static final long HTTP3_SETTINGS_MAX_FIELD_SECTION_SIZE = 0x6;
+    @Deprecated
+    public static final long HTTP3_SETTINGS_MAX_FIELD_SECTION_SIZE =
+            Http3SettingIdentifier.HTTP3_SETTINGS_MAX_FIELD_SECTION_SIZE.id();
 
     /**
      * QPACK blocked streams setting identifier (<b>0x7</b>).
@@ -81,8 +89,12 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
      * HTTP/3 SETTINGS registry (IANA)</a>.
      * <br>
      * Indicates the maximum number of streams that can be blocked waiting for QPACK instructions.
+     *
+     * @deprecated use {@link Http3SettingIdentifier#HTTP3_SETTINGS_QPACK_BLOCKED_STREAMS}.
      */
-    public static final long HTTP3_SETTINGS_QPACK_BLOCKED_STREAMS = 0x7;
+    @Deprecated
+    public static final long HTTP3_SETTINGS_QPACK_BLOCKED_STREAMS =
+            Http3SettingIdentifier.HTTP3_SETTINGS_QPACK_BLOCKED_STREAMS.id();
 
     /**
      * ENABLE_CONNECT_PROTOCOL setting identifier (<b>0x8</b>).
@@ -93,8 +105,12 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
      * HTTP/3 SETTINGS registry (IANA)</a>.
      * <br>
      * Enables use of the CONNECT protocol in HTTP/3 when set to 1; disabled when 0.
+     *
+     * @deprecated use {@link Http3SettingIdentifier#HTTP3_SETTINGS_ENABLE_CONNECT_PROTOCOL}.
      */
-    public static final long HTTP3_SETTINGS_ENABLE_CONNECT_PROTOCOL = 0x8;
+    @Deprecated
+    public static final long HTTP3_SETTINGS_ENABLE_CONNECT_PROTOCOL =
+            Http3SettingIdentifier.HTTP3_SETTINGS_ENABLE_CONNECT_PROTOCOL.id();
 
     private static final Long TRUE = 1L;
     private static final Long FALSE = 0L;
@@ -130,6 +146,7 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
      * <p>
      * The key and value are validated according to the HTTP/3 specification.
      * Reserved HTTP/2 setting identifiers and negative values are not allowed.
+     * Ignore any unknown id/key as per <a href="https://www.rfc-editor.org/rfc/rfc9114.html#section-7.2.4-9>rfc9114</a>
      *
      * @param key   the numeric setting identifier
      * @param value the setting value (non-null)
@@ -138,7 +155,21 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
      */
     @Nullable
     public Long put(long key, Long value) {
-        verifyStandardSetting(key, value);
+        // When HTTP2 settings identifier present - Throw Error
+        if (Http3CodecUtils.isReservedHttp2Setting(key)) {
+            throw new IllegalArgumentException("Setting is reserved for HTTP/2: " + key);
+        }
+
+        Http3SettingIdentifier identifier = Http3SettingIdentifier.fromId(key);
+
+        // When Non-Standard/Unknown settings identifier identifier present - Ignore
+        if (identifier == null) {
+            return value;
+        }
+
+        //Validation
+        verifyStandardSetting(identifier, value);
+
         return settings.put(key, value);
     }
 
@@ -160,7 +191,7 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
      */
     @Nullable
     public Long qpackMaxTableCapacity() {
-        return get(HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY);
+        return get(Http3SettingIdentifier.HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY.id());
     }
 
     /**
@@ -170,7 +201,7 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
      * @return this instance for method chaining
      */
     public Http3Settings qpackMaxTableCapacity(long value) {
-        put(HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY, value);
+        put(Http3SettingIdentifier.HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY.id(), value);
         return this;
     }
 
@@ -181,7 +212,7 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
      */
     @Nullable
     public Long maxFieldSectionSize() {
-        return get(HTTP3_SETTINGS_MAX_FIELD_SECTION_SIZE);
+        return get(Http3SettingIdentifier.HTTP3_SETTINGS_MAX_FIELD_SECTION_SIZE.id());
     }
 
     /**
@@ -191,7 +222,7 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
      * @return this instance for method chaining
      */
     public Http3Settings maxFieldSectionSize(long value) {
-        put(HTTP3_SETTINGS_MAX_FIELD_SECTION_SIZE, value);
+        put(Http3SettingIdentifier.HTTP3_SETTINGS_MAX_FIELD_SECTION_SIZE.id(), value);
         return this;
     }
 
@@ -202,7 +233,7 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
      */
     @Nullable
     public Long qpackBlockedStreams() {
-        return get(HTTP3_SETTINGS_QPACK_BLOCKED_STREAMS);
+        return get(Http3SettingIdentifier.HTTP3_SETTINGS_QPACK_BLOCKED_STREAMS.id());
     }
 
     /**
@@ -212,7 +243,7 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
      * @return this instance for method chaining
      */
     public Http3Settings qpackBlockedStreams(long value) {
-        put(HTTP3_SETTINGS_QPACK_BLOCKED_STREAMS, value);
+        put(Http3SettingIdentifier.HTTP3_SETTINGS_QPACK_BLOCKED_STREAMS.id(), value);
         return this;
     }
 
@@ -223,7 +254,7 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
      */
     @Nullable
     public Boolean connectProtocolEnabled() {
-        Long value = get(HTTP3_SETTINGS_ENABLE_CONNECT_PROTOCOL);
+        Long value = get(Http3SettingIdentifier.HTTP3_SETTINGS_ENABLE_CONNECT_PROTOCOL.id());
         return value == null ? null : TRUE.equals(value);
     }
 
@@ -234,7 +265,29 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
      * @return this instance for method chaining
      */
     public Http3Settings enableConnectProtocol(boolean enabled) {
-        put(HTTP3_SETTINGS_ENABLE_CONNECT_PROTOCOL, enabled ? TRUE : FALSE);
+        put(Http3SettingIdentifier.HTTP3_SETTINGS_ENABLE_CONNECT_PROTOCOL.id(), enabled ? TRUE : FALSE);
+        return this;
+    }
+
+    /**
+     * Returns whether the {@code H3_DATAGRAM} setting is enabled.
+     *
+     * @return {@code true} if enabled, {@code false} if disabled, or {@code null} if not set
+     */
+    @Nullable
+    public Boolean h3DatagramEnabled() {
+        Long value = get(Http3SettingIdentifier.HTTP3_SETTINGS_H3_DATAGRAM.id());
+        return value == null ? null : TRUE.equals(value);
+    }
+
+    /**
+     * Sets the {@code H3_DATAGRAM} settings identifier.
+     *
+     * @param enabled whether to enable the H3 Datagram
+     * @return this instance for method chaining
+     */
+    public Http3Settings enableH3Datagram(boolean enabled) {
+        put(Http3SettingIdentifier.HTTP3_SETTINGS_H3_DATAGRAM.id(), enabled ? TRUE : FALSE);
         return this;
     }
 
@@ -266,7 +319,8 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
                 .qpackMaxTableCapacity(0)
                 .qpackBlockedStreams(0)
                 .maxFieldSectionSize(16 * 1024 * 1024)
-                .enableConnectProtocol(false);
+                .enableConnectProtocol(false)
+                .enableH3Datagram(false);
     }
 
     /**
@@ -344,35 +398,39 @@ public final class Http3Settings implements Iterable<Map.Entry<Long, Long>> {
     }
 
     /**
-     * Validates a setting key and value pair against HTTP/3 and HTTP/2 constraints.
-     *
-     * @param key the setting identifier
+     * Validates a setting identifier and value pair against HTTP/3.
+     * Note that it can only validate the valid HTTP/3 settings
+     * Does not validate non-standard settings
+     * @param identifier the setting identifier
      * @param value the setting value
-     * @throws IllegalArgumentException if the key or value violates the protocol specification
+     * @throws IllegalArgumentException if the identifier or value violates the protocol specification
      */
-    private static void verifyStandardSetting(long key, Long value) {
+    private static void verifyStandardSetting(Http3SettingIdentifier identifier, Long value) {
         checkNotNull(value, "value");
-        if (Http3CodecUtils.isReservedHttp2Setting(key)) {
-            throw new IllegalArgumentException("Setting is reserved for HTTP/2: " + key);
-        }
-        switch ((int) key) {
-            case (int) HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY:
-            case (int) HTTP3_SETTINGS_QPACK_BLOCKED_STREAMS:
-            case (int) HTTP3_SETTINGS_MAX_FIELD_SECTION_SIZE:
+        checkNotNull(identifier, "identifier");
+
+        switch (identifier) {
+            case HTTP3_SETTINGS_QPACK_MAX_TABLE_CAPACITY:
+            case HTTP3_SETTINGS_QPACK_BLOCKED_STREAMS:
+            case HTTP3_SETTINGS_MAX_FIELD_SECTION_SIZE:
                 if (value < 0) {
-                    throw new IllegalArgumentException("Setting 0x" + toHexString(key)
+                    throw new IllegalArgumentException("Setting 0x" + toHexString(identifier.id())
                             + " invalid: " + value + " (must be >= 0)");
                 }
                 break;
-            case (int) HTTP3_SETTINGS_ENABLE_CONNECT_PROTOCOL:
+            case HTTP3_SETTINGS_ENABLE_CONNECT_PROTOCOL:
+            case HTTP3_SETTINGS_H3_DATAGRAM:
                 if (value != 0L && value != 1L) {
-                    throw new IllegalArgumentException("ENABLE_CONNECT_PROTOCOL invalid: " + value
+                    throw new IllegalArgumentException(
+                            "Invalid: " + value + "for "
+                                    + Http3SettingIdentifier.valueOf(String.valueOf(identifier))
                             + " (expected 0 or 1)");
                 }
                 break;
             default:
                 if (value < 0) {
-                    throw new IllegalArgumentException("Setting 0x" + toHexString(key) + " invalid: " + value);
+                    throw new IllegalArgumentException("Setting 0x"
+                            + toHexString(identifier.id()) + " invalid: " + value);
                 }
         }
     }

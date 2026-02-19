@@ -17,9 +17,12 @@ package io.netty.incubator.codec.http3;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Set;
 import java.util.Spliterator;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -217,6 +220,38 @@ public class Http3SettingsTest {
         Http3Settings s1 = new Http3Settings();
         Http3Settings s2 = new Http3Settings();
         assertEquals(s1, s2);
+    }
+
+    @Test
+    void testCustomSettingsNotIgnoredWithValidator() {
+        long customKey = 0xdeadbeefL;
+        Http3Settings settings = new Http3Settings((id, v) -> customKey == id);
+        settings.put(customKey, 123L);
+        assertNotNull(settings.get(customKey));
+    }
+
+    @Test
+    void testCustomSettingsValidatorAllowsAndRejectsMultipleKeys() {
+        Set<Long> allowedKeys = new HashSet<>(Arrays.asList(
+                0xdeadbeefL,
+                0xcafebabeL
+        ));
+
+        long rejectedKey = 0xfeedfaceL;
+
+        Http3Settings settings = new Http3Settings(
+                (id, v) -> allowedKeys.contains(id)
+        );
+
+        // Allowed keys
+        allowedKeys.forEach(key -> {
+            settings.put(key, 1L);
+            assertNotNull(settings.get(key));
+        });
+
+        // Rejected key
+        settings.put(rejectedKey, 1L);
+        assertNull(settings.get(rejectedKey));
     }
 
     @Test

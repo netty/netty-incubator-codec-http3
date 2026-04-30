@@ -88,7 +88,7 @@ public final class Http3ClientExample {
                     }).sync().getNow();
 
             // Write the Header frame and send the FIN to mark the end of the request.
-            // After this its not possible anymore to write any more data.
+            // After this it's not possible anymore to write any more data.
             Http3HeadersFrame frame = new DefaultHttp3HeadersFrame();
             frame.headers().method("GET").path("/")
                     .authority(NetUtil.LOCALHOST4.getHostAddress() + ":" + Http3ServerExample.PORT)
